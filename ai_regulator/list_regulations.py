@@ -265,20 +265,7 @@ def check_revisions(
     1. target_regulations（なければ base_dir下のtarget_regulations.json から取得）を読み込み、
        各規定ファイルの内容・更新情報(update_info.txt)・"reason"を LLM に渡して
        "revision_needed" (bool) と "comment" (str) を判断させる。
-
     2. Reflection（num_reflections回）を行い、最終的なJSONを確定する。
-       出力形式は:
-         THOUGHT:
-         <THOUGHT>
-
-         CHECK RESULT JSON:
-         ```json
-         {
-           "revision_needed": true or false,
-           "comment": "..."
-         }
-         ```
-
     3. 結果を各規定に付与してリストを返す。
     """
     if not target_regulations:
