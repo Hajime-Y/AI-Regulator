@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<regulations>
+  <category id="yen" name="円預金">
+    <section name="普通預金">
+      <item>普通預金規定</item>
+      <item>普通預金（照合表口）規定</item>
+      <item>普通預金［決済専用無利息型］規定</item>
+      <item>普通預金［段階金利型］（スーパー普通預金）規定</item>
+      <item>普通預金［全額保護型］（スーパー普通預金）規定</item>
+      <item>普通預金［オンライン取引専用キャッシュカード不発行型］（つかいわけ口座）利用規定</item>
+      <item>メインバンク プラス ポイントサービス規定</item>
+      <item>Eco通帳規定</item>
+      <item>Eco通知取引規定</item>
+      <item>休眠預金規定</item>
+      <item>印鑑レス口座取引規定</item>
+      <item>通帳に関する特約</item>
+    </section>
+    <section name="スマート口座開設">
+      <item>「スマート口座開設」利用規定</item>
+    </section>
+    <section name="タブレット口座開設">
+      <item>「タブレット口座開設」規定</item>
+    </section>
+    <section name="定期預金">
+      <item>定期預金共通規定</item>
+      <item>期日指定定期預金規定</item>
+      <item>自動継続期日指定定期預金規定</item>
+      <item>自由金利型定期預金（M型）（スーパー定期）規定</item>
+      <item>自動継続自由金利型定期預金（M型）（スーパー定期）規定</item>
+      <item>自由金利型定期預金規定</item>
+      <item>自動継続自由金利型定期預金規定</item>
+      <item>自動つみたて定期預金規定</item>
+      <item>自動振替規定</item>
+      <item>総合口座取引規定、総合口座取引追加規定</item>
+      <item>休眠預金規定</item>
+      <item>財形預金規定</item>
+    </section>
+    <section name="キャッシュカード・三菱ＵＦＪデビットなど">
+      <subsection name="キャッシュカードなど">
+        <item>ICキャッシュカード規定</item>
+        <item>キャッシュカード規定</item>
+        <item>貯蓄預金キャッシュカード規定</item>
+        <item>当座キャッシュカード規定</item>
+        <item>J-Debit　デビットカード取引規定</item>
+        <item>店頭ICカード認証規定</item>
+      </subsection>
+      <subsection name="三菱ＵＦＪデビット">
+        <item>三菱ＵＦＪデビット会員規約・関連規定</item>
+        <item>三菱ＵＦＪデビット一体型キャッシュカード特約</item>
+        <item>個人情報の取り扱いに関する同意書</item>
+        <item>三菱ＵＦＪデビット留意事項</item>
+        <item>三菱ＵＦＪ-VISAデビット保険のしおり</item>
+        <item>三菱ＵＦＪ-JCBデビット保険のご案内</item>
+      </subsection>
+      <subsection name="三菱ＵＦＪ-VISAビジネスデビット">
+        <item>三菱ＵＦＪ-VISAビジネスデビット会員規約</item>
+        <item>三菱ＵＦＪ-VISAビジネスデビット個人情報の取り扱いに関する同意書</item>
+        <item>三菱ＵＦＪ-VISAビジネスデビット留意事項</item>
+      </subsection>
+    </section>
+    <section name="社内キャッシュカード">
+      <item>社内キャッシュサービスの利用に関する規定</item>
+      <item>預金口座振替規定（株式会社三菱ＵＦＪ銀行宛）</item>
+    </section>
+    <section name="当座勘定">
+      <item>当座勘定規定書（個人当座用）</item>
+      <item>当座勘定規定書（個人当座用）（英文）</item>
+      <item>当座勘定規定書（法人）</item>
+      <item>当座勘定規定（2024年1月4日以降口座開設先）</item>
+    </section>
+    <section name="納税準備預金">
+      <item>納税準備預金規定</item>
+    </section>
+    <section name="通知預金">
+      <item>通知預金（特例型）規定（証書式）</item>
+      <item>通知預金（特例型）規定（通帳式）</item>
+      <item>通知預金（通帳式）規定</item>
+      <item>通知預金（証書式）規定</item>
+      <item>通知預金（照合表口）規定</item>
+    </section>
+    <section name="Global Master Terms and Conditions">
+      <item>Master Terms of Business for Banking</item>
+      <item>Japan Country Addendum</item>
+    </section>
+  </category>
+
+  <category id="furikomi" name="振込">
+    <section name="振込">
+      <item>振込規定</item>
+    </section>
+    <section name="定額自動送金">
+      <item>定額自動送金約定</item>
+    </section>
+  </category>
+
+  <category id="gaika" name="外貨預金">
+    <section name="外貨普通預金">
+      <item>外貨普通預金規定</item>
+    </section>
+    <section name="外貨貯蓄預金">
+      <item>外貨貯蓄預金規定</item>
+      <item>外貨貯蓄預金継続預入プラン規定</item>
+    </section>
+    <section name="外貨定期預金">
+      <item>外貨定期預金規定</item>
+    </section>
+  </category>
+
+  <category id="toushin" name="投資信託">
+    <section name="投資信託規定集">
+      <item>投資信託総合取引規定</item>
+      <item>外国証券取引口座規定</item>
+      <item>投資信託継続購入プラン規定</item>
+      <item>投資信託受益権振替決済口座管理規定</item>
+      <item>特定口座規定</item>
+      <item>特定口座に係る上場株式配当等受領委任に関する規定</item>
+      <item>非課税上場株式等管理、非課税累積投資および特定非課税累積投資に関する規定</item>
+      <item>未成年者口座および課税未成年者口座開設に関する規定</item>
+      <item>投資信託累積投資規定</item>
+    </section>
+  </category>
+
+  <category id="koukyousai" name="公共債">
+    <section name="国債等公共債お預り規定書">
+      <item>振替決済口座管理規定</item>
+      <item>地方債証券等振替決済口座管理規定</item>
+      <item>特定口座規定</item>
+      <item>特定口座に係る上場株式配当等受領委任に関する規定</item>
+    </section>
+  </category>
+
+  <category id="direct" name="三菱ＵＦＪダイレクト（インターネットバンキング）">
+    <section name="三菱ＵＦＪダイレクト">
+      <item>三菱ＵＦＪダイレクト利用規定</item>
+    </section>
+    <section name="インターネット支店">
+      <item>インターネット支店取引規定</item>
+      <item>インターネット定期預金規定</item>
+      <item>インターネット外貨定期預金規定</item>
+    </section>
+  </category>
+
+  <category id="tablet" name="タブレット手続受付">
+    <section name="タブレット手続受付">
+      <item>タブレット手続受付　利用規定</item>
+    </section>
+  </category>
+
+  <category id="card" name="カードローン">
+    <section name="バンクイック">
+      <item>カードローン「バンクイック」ローン規定</item>
+      <item>カードローン「バンクイック」カード規定</item>
+      <item>Eメールサービス利用規約</item>
+      <item>カードローン「バンクイック」保証委託約款</item>
+      <item>バンクイックアプリ利用規定</item>
+    </section>
+    <section name="マイカードプラス">
+      <item>マイカード プラス・ローン規定</item>
+      <item>マイカード・カードローンカード規定</item>
+      <item>個人情報の取り扱いに関する同意書</item>
+      <item>マイカード プラス保証委託約款</item>
+    </section>
+  </category>
+
+  <category id="kinko" name="貸金庫">
+    <section name="貸金庫">
+      <item>貸金庫規定</item>
+    </section>
+  </category>
+
+  <category id="gaikokusoukin" name="外国送金">
+    <section name="外国送金">
+      <item>外国送金取引規定</item>
+      <item>Terms and Conditions of Foreign Remittance Transactions</item>
+    </section>
+  </category>
+</regulations>
