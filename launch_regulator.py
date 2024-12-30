@@ -19,6 +19,7 @@ from aider.models import Model
 from ai_regulator.list_regulations import list_regulations, check_revisions
 from ai_regulator.perform_revision import draft_revision, review_revision, improve_revision
 from ai_regulator.generate_report import generate_report
+from ai_regulator.llm import create_client, AVAILABLE_LLMS
 
 NUM_REFLECTIONS = 3
 
@@ -42,6 +43,18 @@ def parse_arguments():
         type=str,
         default=None,
         help="Comma-separated list of GPU IDs to use (e.g., '0,1,2'). If not specified, all available GPUs will be used.",
+    )
+    parser.add_argument(
+        "--regulations_dir",
+        type=str,
+        required=True,
+        help="Path to the regulations directory.",
+    )
+    parser.add_argument(
+        "--base_dir",
+        type=str,
+        required=True,
+        help="Path to the base directory.",
     )
 
     return parser.parse_args()
@@ -120,7 +133,7 @@ def _append_review(review_file, review_data):
         with open(review_file, "w", encoding="utf-8") as f:
             json.dump(existing_data, f, ensure_ascii=False, indent=2)
 
-def worker(queue, revision_file, review_file, gpu_id):
+def worker(queue, revision_file, review_file, gpu_id, regulations_dir, base_dir, client, model):
     """
     並列実行時に呼ばれるワーカー関数。
     queue から規定を取り出して revise する。
@@ -153,18 +166,37 @@ def main():
 
     print(f"Using GPUs: {available_gpus}")
 
+    # client初期化
+    client, client_model = create_client(args.model)
+
+    regulations_dir = args.regulations_dir
+    base_dir = args.base_dir
+
     # 規定集をリストアップ
-    regulations = list_regulations()
+    regulations = list_regulations(
+        regulations_dir=regulations_dir,
+        base_dir=base_dir,
+        client=client,
+        model=client_model,
+        num_reflections=NUM_REFLECTIONS,
+    )
     # 規定ファイルを保存（ターゲットとなる規定の一覧）
-    with open("target_regulations.json", "w", encoding="utf-8") as f:
+    with open(os.path.join(base_dir, "target_regulations.json"), "w", encoding="utf-8") as f:
         json.dump(regulations, f, ensure_ascii=False, indent=2)
 
     # 改定要否の確認（改定が必要なものをフィルタリングするなど）
-    regs_to_revise = check_revisions(regulations)
+    regs_to_revise = check_revisions(
+        target_regulations=regulations,
+        regulations_dir=regulations_dir,
+        base_dir=base_dir,
+        client=client,
+        model=client_model,
+        num_reflections=NUM_REFLECTIONS,
+    )
 
     # revision.json と review.json の初期化（あれば流用でもよい）
-    revision_file = "revision.json"
-    review_file = "review.json"
+    revision_file = os.path.join(base_dir, "revision.json")
+    review_file = os.path.join(base_dir, "review.json")
 
     # すでに存在していれば（前回処理の続きなどを想定し）追記可能だが、
     # 必要に応じて初期化する場合はコメントアウトを外してください。
@@ -189,7 +221,7 @@ def main():
             gpu_id = available_gpus[i % len(available_gpus)]
             p = multiprocessing.Process(
                 target=worker,
-                args=(queue, revision_file, review_file, gpu_id),
+                args=(queue, revision_file, review_file, gpu_id, regulations_dir, base_dir, client, model),
             )
             p.start()
             # 必要に応じてワーカー間の起動間隔を入れる (例: time.sleep(2))
