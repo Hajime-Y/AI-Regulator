@@ -17,7 +17,8 @@ from aider.models import Model
 
 # AI Regulator 用モジュール
 from ai_regulator.list_regulations import list_regulations, check_revisions
-from ai_regulator.perform_revision import draft_revision, review_revision, improve_revision
+from ai_regulator.perform_revision import draft_revision
+from ai_regulator.perform_review import review_revision, improve_revision
 from ai_regulator.generate_report import generate_report
 from ai_regulator.llm import create_client, AVAILABLE_LLMS
 
@@ -56,6 +57,12 @@ def parse_arguments():
         required=True,
         help="Path to the base directory.",
     )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="gpt-4",
+        help="使用するLLMモデル",
+    )
 
     return parser.parse_args()
 
@@ -68,7 +75,7 @@ def get_available_gpus(gpu_ids=None):
         return [int(gpu_id) for gpu_id in gpu_ids.split(",")]
     return list(range(torch.cuda.device_count()))
 
-def do_regulation(regulation, revision_file, review_file):
+def do_regulation(regulation, revision_file, review_file, regulations_dir, coder, num_reflections):
     """
     1つの規定を改定するための処理をまとめた関数。
     以下の手順を実行する:
@@ -82,7 +89,17 @@ def do_regulation(regulation, revision_file, review_file):
     print(f"[*] Start revising: {regulation['title']}")
 
     # 改定案の作成
-    draft_res = draft_revision(regulation)
+    draft_res = draft_revision(
+        regulation=regulation,
+        regulations_dir=regulations_dir,
+        coder=coder,
+        out_file=revision_file,
+        num_reflections=num_reflections
+    )
+    if not draft_res:
+        print(f"[draft_revision] 規定 {regulation['title']} の改定案生成に失敗しました。")
+        return
+
     # draft_revision の結果(バージョン1)を revision.json に保存
     _append_revision(revision_file, draft_res)
 
@@ -133,7 +150,7 @@ def _append_review(review_file, review_data):
         with open(review_file, "w", encoding="utf-8") as f:
             json.dump(existing_data, f, ensure_ascii=False, indent=2)
 
-def worker(queue, revision_file, review_file, gpu_id, regulations_dir, base_dir, client, model):
+def worker(queue, revision_file, review_file, gpu_id, regulations_dir, base_dir, client, model, coder, num_reflections):
     """
     並列実行時に呼ばれるワーカー関数。
     queue から規定を取り出して revise する。
@@ -147,7 +164,7 @@ def worker(queue, revision_file, review_file, gpu_id, regulations_dir, base_dir,
         if regulation is None:
             break
         try:
-            do_regulation(regulation, revision_file, review_file)
+            do_regulation(regulation, revision_file, review_file, regulations_dir, coder, num_reflections)
         except Exception as e:
             print(f"Failed to revise regulation {regulation['title']}: {str(e)}")
 
@@ -164,6 +181,7 @@ def main():
         )
         args.parallel = len(available_gpus)
 
+    print_time()
     print(f"Using GPUs: {available_gpus}")
 
     # client初期化
@@ -205,6 +223,18 @@ def main():
     # if osp.exists(review_file):
     #     os.remove(review_file)
 
+    # Coderの初期化（launch_scientist.pyを参照）
+    io = InputOutput(yes=True, chat_history_file="revision_history.txt")
+    main_model = Model(args.model)
+    coder = Coder.create(
+        main_model=main_model,
+        fnames=[revision_file, review_file],
+        io=io,
+        stream=False,
+        use_git=False,
+        edit_format="diff",
+    )
+
     # 並列実行モードとシーケンシャルモードの分岐
     if args.parallel > 0:
         print(f"Running {args.parallel} parallel processes")
@@ -221,7 +251,7 @@ def main():
             gpu_id = available_gpus[i % len(available_gpus)]
             p = multiprocessing.Process(
                 target=worker,
-                args=(queue, revision_file, review_file, gpu_id, regulations_dir, base_dir, client, model),
+                args=(queue, revision_file, review_file, gpu_id, regulations_dir, base_dir, client, client_model, coder, NUM_REFLECTIONS),
             )
             p.start()
             # 必要に応じてワーカー間の起動間隔を入れる (例: time.sleep(2))
@@ -240,7 +270,7 @@ def main():
         # シーケンシャル実行
         for reg in regs_to_revise:
             try:
-                do_regulation(reg, revision_file, review_file)
+                do_regulation(reg, revision_file, review_file, regulations_dir, coder, NUM_REFLECTIONS)
             except Exception as e:
                 print(f"Failed to revise regulation {reg['title']}: {str(e)}")
 
