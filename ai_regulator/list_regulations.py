@@ -51,7 +51,7 @@ THOUGHTでは、まず改定が必要だと考えられる業務や金融商品�
 その後、その業務や金融商品に関連する規定をリストアップします。
 
 TARGET REGULATIONS JSONには、上記のようなフィールドを持つJSONフォーマットのリストを提供してください：
-- "path": toc.xmlを参照して得た改定の必要がありそうな資料の相対パス。
+- "path": toc.xmlを参照して得た改定の必要がありそうな資料の相対パス。XML内のカテゴリ名、セクション名、規定名を「/」で連結した相対パス。必ず".pdf"を付けてください。例: "円預金/普通預金/普通預金規定.pdf"
 - "reason": その資料を改定する必要があると想定した理由、想定される改定内容を簡潔に記載。後続の規定集確認者に伝えられる。
 
 このJSONは自動的に解析されるため、フォーマットは正確である必要があります。
@@ -213,7 +213,7 @@ def list_regulations(
         return []
 
     # --- Step 2: Reflection ---
-    final_json_str = raw_json
+    final_json = raw_json
     if num_reflections > 1:
         for j in range(num_reflections - 1):
             if "I am done" in text:
@@ -233,20 +233,18 @@ def list_regulations(
             )
             new_json = extract_json_between_markers(reflection_text)
             if new_json is not None:
-                final_json_str = new_json
+                final_json = new_json
             text = reflection_text
             if "I am done" in text:
                 break
 
     # --- Step 3: JSONパース & ファイル存在チェック ---
-    try:
-        proposed_list = json.loads(final_json_str)
-    except Exception as e:
-        print("[list_regulations] Error parsing final JSON:", e)
+    if raw_json is None:
+        print("[list_regulations] Error: No valid JSON found")
         return []
 
     final_list = []
-    for item in proposed_list:
+    for item in final_json:
         rel_path = item.get("path")
         reason = item.get("reason", "")
         if not rel_path:
@@ -343,7 +341,7 @@ def check_revisions(
             continue
 
         # --- Step 2: Reflection ---
-        final_json_str = raw_json
+        final_json = raw_json
         if num_reflections > 1:
             for j in range(num_reflections - 1):
                 if "I am done" in text:
@@ -364,22 +362,20 @@ def check_revisions(
                 )
                 new_json = extract_json_between_markers(reflection_text)
                 if new_json is not None:
-                    final_json_str = new_json
+                    final_json = new_json
                 text = reflection_text
                 if "I am done" in text:
                     print(f"[check_revisions] Reflection completed for: {rel_path}")
                     break
 
         # --- Step 3: 最終JSONをパース & 書き込み ---
-        try:
-            check_result = json.loads(final_json_str)
-            reg["revision_needed"] = check_result.get("revision_needed", False)
-            reg["comment"] = check_result.get("comment", "")
-            print(f"[check_revisions] Revision needed: {reg['revision_needed']} for: {rel_path}")
-        except Exception as e:
+        if final_json is None:
             reg["revision_needed"] = False
-            reg["comment"] = f"Error parsing final JSON: {e}"
-            print(f"[check_revisions] Error parsing JSON for: {rel_path} - {e}")
+            reg["comment"] = "No valid JSON found"
+        else:
+            reg["revision_needed"] = final_json.get("revision_needed", False)
+            reg["comment"] = final_json.get("comment", "")
+        print(f"[check_revisions] Revision needed: {reg['revision_needed']} for: {rel_path}")
 
         updated_list.append(reg)
 
