@@ -43,10 +43,10 @@ THOUGHT:
 DRAFT REVISION JSON:
 ```json
 [
-  {
+  {{
     "original_text": "...",
     "revised_text": "..."
-  },
+  }},
   ...
 ]
 ```

@@ -40,10 +40,10 @@ THOUGHT:
 TARGET REGULATIONS JSON:
 ```json
 [
-  {
+  {{
     "path": "<相対パス>",
     "reason": "<なぜ改定が必要か>"
-  },
+  }},
   ...
 ]
 ```
@@ -174,7 +174,7 @@ def list_regulations(
         update_info = f.read()
 
     target_regulations_file = osp.join(base_dir, "target_regulations.json")
-    
+
     if skip_list_regulations:
         # 既存のtarget_regulations.jsonを読み込む
         try:
@@ -420,7 +420,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         type=str,
-        default="claude-3-5-sonnet-20240620",
+        default="gpt-4o-2024-11-20",
         choices=AVAILABLE_LLMS,
         help="Model to use for AI Regulator.",
     )
