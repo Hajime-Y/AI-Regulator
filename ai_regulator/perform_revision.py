@@ -11,7 +11,7 @@ from aider.models import Model
 # --------------------------------------------
 
 DRAFT_REVISION_SYSTEM_PROMPT = """あなたは銀行規定の改定を行うAIアシスタントです。
-以下に示す「規定集の内容」と別の人が作成した「改定が必要だと考えられる理由・箇所」に基づき、
+以下に示す「改定に関する銀行規定等の変更情報(update_info)」「規定集の内容(regulation_content)」と別の人が作成した「改定が必要だと考えられる理由・箇所(reason_and_comment)」に基づき、
 (1) 改定前の文面 (original_text) と
 (2) 改定後の文面 (revised_text)
 のペアを複数リスト形式で生成してください。
@@ -22,6 +22,10 @@ DRAFT_REVISION_SYSTEM_PROMPT = """あなたは銀行規定の改定を行うAI�
 
 DRAFT_REVISION_USER_PROMPT = """以下の情報をもとに、改定案(1)改定前の文面 + (2)改定後の文面 を複数ペアで示してください。
 なお、(1) 改定前の文面はファイル内の文章そのままを引用し、(2) 改定後の文面では省略や「...」などを使わずに改定案の全文を記載してください。
+
+<update_info>
+{update_info}
+</update_info>
 
 <regulation_content>
 {regulation_content}
@@ -93,6 +97,7 @@ def _check_revision(
 def draft_revision(
         regulation: Dict[str, Any],
         regulations_dir: str,
+        base_dir: str,
         coder: Coder,
         out_file: str,
         num_reflections: int = 1,
@@ -121,6 +126,16 @@ def draft_revision(
         ...
     ]
     """
+    # update_info.txtの読み込み
+    update_info_path = osp.join(base_dir, "update_info.txt")
+    if not osp.exists(update_info_path):
+        print("[review_revisions] update_info.txt not found.")
+        return []
+    
+    with open(update_info_path, "r", encoding="utf-8") as f:
+        update_info = f.read()
+
+    # 規定ファイルの読み込み
     rel_path = regulation.get("path")
     if not rel_path:
         print("[draft_revision] No path found in regulation.")
@@ -134,11 +149,13 @@ def draft_revision(
     with open(full_path, "r", encoding="utf-8") as f:
         regulation_content = f.read()
 
+    # 改定理由とコメント
     reason_and_comment = f"Reason: {regulation.get('reason', '')}\nComment: {regulation.get('comment', '')}\n"
 
     # --- Step 1: 初回生成 ---
     system_msg = DRAFT_REVISION_SYSTEM_PROMPT
     user_prompt = DRAFT_REVISION_USER_PROMPT.format(
+        update_info=update_info,
         regulation_content=regulation_content,
         reason_and_comment=reason_and_comment,
     )

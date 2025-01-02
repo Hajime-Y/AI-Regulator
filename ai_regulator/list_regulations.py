@@ -3,9 +3,7 @@ import os.path as osp
 import json
 from typing import List, Dict, Any
 
-# 以下、generate_ideas.py内で利用されている関数を想定。
-# ここではご利用の実装に合わせて置き換えてください。
-from ai_regulator.llm import get_response_from_llm, extract_json_between_markers
+from ai_regulator.llm import get_response_from_llm, extract_json_between_markers, create_client, AVAILABLE_LLMS
 
 # ---------------------------------------------------
 # 定数・システムプロンプトなど
@@ -150,7 +148,8 @@ def list_regulations(
     base_dir: str,
     client,
     model,
-    num_reflections: int = 1,
+    num_reflections: int = 5,
+    skip_list_regulations: bool = False,
 ):
     """
     1. regulations_dir下のtoc.xmlとbase_dir下のupdate_info.txtを読み込み、
@@ -160,9 +159,9 @@ def list_regulations(
     3. 規定ファイルの存在チェックを行い、実在しないファイルはリストから除外する。
     4. 結果を target_regulations.json として保存し、リストを返す。
     """
+
     toc_path = osp.join(regulations_dir, "toc.xml")
     update_info_path = osp.join(base_dir, "update_info.txt")
-    target_regulations_file = osp.join(base_dir, "target_regulations.json")
 
     if not osp.exists(toc_path):
         raise FileNotFoundError(f"toc.xml not found in {regulations_dir}")
@@ -173,6 +172,22 @@ def list_regulations(
         toc_content = f.read()
     with open(update_info_path, "r", encoding="utf-8") as f:
         update_info = f.read()
+
+    target_regulations_file = osp.join(base_dir, "target_regulations.json")
+    
+    if skip_list_regulations:
+        # 既存のtarget_regulations.jsonを読み込む
+        try:
+            with open(target_regulations_file, "r", encoding="utf-8") as f:
+                regulations = json.load(f)
+            print("Loaded existing regulations:")
+            for reg in regulations:
+                print(reg)
+            return regulations
+        except FileNotFoundError:
+            print("No existing target_regulations.json found. Generating new regulations.")
+        except json.JSONDecodeError:
+            print("Error decoding existing target_regulations.json. Generating new regulations.")
 
     # --- Step 1: 最初の呼び出し ---
     msg_history = []
@@ -244,7 +259,7 @@ def list_regulations(
 
     # --- Step 4: 保存 & 結果を返す ---
     with open(target_regulations_file, "w", encoding="utf-8") as f:
-        json.dump(final_list, f, ensure_ascii=False, indent=2)
+        json.dump(final_list, f, ensure_ascii=False, indent=4)
 
     print(f"[list_regulations] Done. Saved {len(final_list)} targets to {target_regulations_file}")
     return final_list
@@ -266,7 +281,8 @@ def check_revisions(
        各規定ファイルの内容・更新情報(update_info.txt)・"reason"を LLM に渡して
        "revision_needed" (bool) と "comment" (str) を判断させる。
     2. Reflection（num_reflections回）を行い、最終的なJSONを確定する。
-    3. 結果を各規定に付与してリストを返す。
+    3. 結果を各規定に付与する。
+    4. 結果を target_regulations.json として保存し、リストを返す。
     """
     if not target_regulations:
         target_regulations_file = osp.join(base_dir, "target_regulations.json")
@@ -367,4 +383,83 @@ def check_revisions(
 
         updated_list.append(reg)
 
+    # --- Step 4: 保存 & 結果を返す ---
+    with open(target_regulations_file, "w", encoding="utf-8") as f:
+        json.dump(updated_list, f, ensure_ascii=False, indent=4)
+
+    print(f"[check_revisions] Done. Updated {len(updated_list)} targets to {target_regulations_file}")
     return updated_list
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="List and check regulations that need revision")
+    parser.add_argument(
+        "--skip_list_regulations",
+        action="store_true",
+        help="Skip regulation listing and use existing target_regulations.json.",
+    )
+    parser.add_argument(
+        "--skip_check",
+        action="store_true",
+        help="Skip revision check and only list target regulations.",
+    )
+    parser.add_argument(
+        "--regulations_dir",
+        type=str,
+        required=True,
+        help="Path to the regulations directory.",
+    )
+    parser.add_argument(
+        "--base_dir",
+        type=str,
+        required=True,
+        help="Path to the base directory.",
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="claude-3-5-sonnet-20240620",
+        choices=AVAILABLE_LLMS,
+        help="Model to use for AI Regulator.",
+    )
+    parser.add_argument(
+        "--num_reflections",
+        type=int,
+        default=3,
+        help="Number of reflection rounds for each process.",
+    )
+    args = parser.parse_args()
+
+    # クライアントの初期化
+    client, client_model = create_client(args.model)
+
+    print("[*] Starting regulation listing process...")
+    
+    # 規定集をリストアップ
+    regulations = list_regulations(
+        regulations_dir=args.regulations_dir,
+        base_dir=args.base_dir,
+        client=client,
+        model=client_model,
+        num_reflections=args.num_reflections,
+        skip_list_regulations=args.skip_list_regulations,
+    )
+    print(f"[+] Listed {len(regulations)} potential regulations for revision")
+
+    # 改定要否の確認（--skip_checkが指定されていない場合）
+    if not args.skip_check:
+        print("[*] Starting revision check process...")
+        regulations = check_revisions(
+            target_regulations=regulations,
+            regulations_dir=args.regulations_dir,
+            base_dir=args.base_dir,
+            client=client,
+            model=client_model,
+            num_reflections=args.num_reflections,
+        )
+        print(f"[+] Completed revision check. {sum(1 for r in regulations if r.get('revision_needed', False))} regulations need revision")
+    
+    print("[+] Process completed")
+

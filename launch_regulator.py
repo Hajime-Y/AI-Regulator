@@ -9,6 +9,7 @@ import sys
 import time
 import torch
 from datetime import datetime
+from typing import Dict, Any
 
 # aider関連のライブラリは必要に応じてインストールしてください
 from aider.coders import Coder
@@ -22,8 +23,6 @@ from ai_regulator.perform_review import review_revision, improve_revision
 from ai_regulator.generate_report import generate_report
 from ai_regulator.llm import create_client, AVAILABLE_LLMS
 
-NUM_REFLECTIONS = 3
-
 def print_time():
     """現在時刻を表示するヘルパー関数"""
     print(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
@@ -32,18 +31,21 @@ def parse_arguments():
     """AI Regulator用の引数をパースする関数"""
     parser = argparse.ArgumentParser(description="Run AI regulator")
 
-    # 必要に応じてコマンドライン引数を追加
+    parser.add_argument(
+        "--skip_list_regulations",
+        action="store_true",
+        help="Skip regulation listing and use existing target_regulations.json.",
+    )
+    parser.add_argument(
+        "--skip_check",
+        action="store_true",
+        help="Skip revision check and only list target regulations.",
+    )
     parser.add_argument(
         "--parallel",
         type=int,
         default=0,
         help="Number of parallel processes to run. 0 for sequential execution.",
-    )
-    parser.add_argument(
-        "--gpus",
-        type=str,
-        default=None,
-        help="Comma-separated list of GPU IDs to use (e.g., '0,1,2'). If not specified, all available GPUs will be used.",
     )
     parser.add_argument(
         "--regulations_dir",
@@ -60,8 +62,36 @@ def parse_arguments():
     parser.add_argument(
         "--model",
         type=str,
-        default="gpt-4",
-        help="使用するLLMモデル",
+        default="gpt-4o-2024-11-20",
+        choices=AVAILABLE_LLMS,
+        help="Model to use for AI Regulator.",
+    )
+    parser.add_argument(
+        "--draft",
+        action="store_true",
+        help="Create draft revisions.",
+    )
+    parser.add_argument(
+        "--review",
+        action="store_true",
+        help="Perform reviews on drafts.",
+    )
+    parser.add_argument(
+        "--improvement",
+        action="store_true",
+        help="Improve based on reviews.",
+    )
+    parser.add_argument(
+        "--gpus",
+        type=str,
+        default=None,
+        help="Comma-separated list of GPU IDs to use (e.g., '0,1,2'). If not specified, all available GPUs will be used.",
+    )
+    parser.add_argument(
+        "--num_reflections",
+        type=int,
+        default=3,
+        help="Number of reflection iterations. Default is 3.",
     )
 
     return parser.parse_args()
@@ -75,46 +105,145 @@ def get_available_gpus(gpu_ids=None):
         return [int(gpu_id) for gpu_id in gpu_ids.split(",")]
     return list(range(torch.cuda.device_count()))
 
-def do_regulation(regulation, revision_file, review_file, regulations_dir, coder, num_reflections):
+def do_regulation(
+    regulation: Dict[str, Any],
+    regulations_dir: str,
+    base_dir: str,
+    num_reflections: int,
+    model: str,
+    client: Any,
+    client_model: str,
+    draft: bool = True,
+    review: bool = False,
+    improvement: bool = False,
+    log_file: bool = False,
+) -> bool:
     """
     1つの規定を改定するための処理をまとめた関数。
-    以下の手順を実行する:
-      1. 改定案の作成 (draft_revision)
-      2. 改定案のレビュー (review_revision)
-      3. 改定案の改善 (improve_revision)
-    結果は revision_file (revision.json) に上書きで追記し、
-    review_file (review.json) にも必要に応じて追記する。
+    フラグに応じて以下の手順を実行する:
+      1. 改定案の作成 (draft_revision) - draft=True
+      2. 改定案のレビュー (review_revision) - review=True
+      3. 改定案の改善 (improve_revision) - improvement=True
+    結果は revision_file (revision.json) と review_file (review.json) に出力。
     """
-    print_time()
-    print(f"[*] Start revising: {regulation['title']}")
+    # ログファイル用の標準出力・標準エラー出力の退避
+    if log_file:
+        original_stdout = sys.stdout
+        original_stderr = sys.stderr
+        log_path = osp.join(folder_name, "log.txt")
+        log = open(log_path, "a")
+        sys.stdout = log
+        sys.stderr = log
 
-    # 改定案の作成
-    draft_res = draft_revision(
-        regulation=regulation,
-        regulations_dir=regulations_dir,
-        coder=coder,
-        out_file=revision_file,
-        num_reflections=num_reflections
-    )
-    if not draft_res:
-        print(f"[draft_revision] 規定 {regulation['title']} の改定案生成に失敗しました。")
-        return
+    try:
+        # regulation_nameを生成（pathから拡張子なしのファイル名を取得）
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        regulation_name = os.path.splitext(os.path.basename(regulation["path"]))[0] + "_" + timestamp
+        folder_name = osp.join(base_dir, regulation_name)
+        
+        # フォルダ作成とファイルパス設定
+        os.makedirs(folder_name, exist_ok=True)
+        revision_file = osp.join(folder_name, "revision.json")
+        review_file = osp.join(folder_name, "review.json")
 
-    # draft_revision の結果(バージョン1)を revision.json に保存
-    _append_revision(revision_file, draft_res)
+        print_time()
+        print(f"[*] Start revising: {regulation['path']}")
 
-    # レビュー
-    review_res = review_revision(draft_res)
-    _append_review(review_file, review_res)
+        # Coderの初期化
+        io = InputOutput(yes=True, chat_history_file=f"{folder_name}/revision_history.txt")
+        if model == "deepseek-coder-v2-0724":
+            main_model = Model("deepseek/deepseek-coder")
+        elif model == "llama3.1-405b":
+            main_model = Model("openrouter/meta-llama/llama-3.1-405b-instruct")
+        else:
+            main_model = Model(model)
+        coder = Coder.create(
+            main_model=main_model,
+            fnames=[revision_file],
+            io=io,
+            stream=False,
+            use_git=False,
+            edit_format="diff",
+        )
 
-    # 改善
-    improved_res = improve_revision(draft_res, review_res)
-    # improve_revision の結果(バージョン2)を revision.json に再度上書き追記
-    _append_revision(revision_file, improved_res)
+        draft_res = None
+        review_res = None
 
-    print_time()
-    print(f"[+] Finished revising: {regulation['title']}")
-    return
+        # 改定案の作成
+        if draft:
+            draft_res = draft_revision(
+                regulation=regulation,
+                regulations_dir=regulations_dir,
+                base_dir=folder_name,
+                coder=coder,
+                out_file=revision_file,
+                num_reflections=num_reflections,
+            )
+            if not draft_res:
+                print(f"[draft_revision] 規定 {regulation['path']} の改定案生成に失敗しました。")
+                return False
+            
+            # draft_revision の結果(バージョン1)を revision.json に保存
+            _append_revision(revision_file, draft_res)
+        elif osp.exists(revision_file):
+            # 既存の改定案を読み込む
+            with open(revision_file, "r", encoding="utf-8") as f:
+                revisions = json.load(f)
+                draft_res = revisions[-1] if isinstance(revisions, list) else revisions
+
+        # レビュー
+        if review and draft_res:
+            review_res = review_revision(
+                regulation=regulation,
+                draft_revision=draft_res,
+                regulations_dir=regulations_dir,
+                base_dir=folder_name,
+                model=client_model,
+                client=client,
+                num_reflections=num_reflections,
+                num_reviews_ensemble=5,
+                temperature=0.1,
+            )
+            if not review_res:
+                print(f"[review_revision] 規定 {regulation['path']} のレビューに失敗しました。")
+                return False
+            
+            _append_review(review_file, review_res)
+        elif osp.exists(review_file):
+            # 既存のレビューを読み込む
+            with open(review_file, "r", encoding="utf-8") as f:
+                reviews = json.load(f)
+                review_res = reviews[-1] if isinstance(reviews, list) else reviews
+
+        # 改善
+        if improvement and draft_res and review_res:
+            improved_res = improve_revision(
+                current_draft=draft_res,
+                review_data=review_res,
+                coder=coder,
+                num_reflections=num_reflections,
+            )
+            if not improved_res:
+                print(f"[improve_revision] 規定 {regulation['path']} の改善に失敗しました。")
+                return False
+
+            # improve_revision の結果(バージョン2)を revision.json に再度上書き追記
+            _append_revision(revision_file, improved_res)
+
+        print_time()
+        print(f"[+] Finished revising: {regulation['path']}")
+        return True
+
+    except Exception as e:
+        print(f"[!] Error in do_regulation for {regulation.get('path', 'Unknown')}: {str(e)}")
+        return False
+
+    finally:
+        if log_file:
+            sys.stdout = original_stdout
+            sys.stderr = original_stderr
+            log.close()
+
 
 def _append_revision(revision_file, revision_data):
     """
@@ -150,25 +279,48 @@ def _append_review(review_file, review_data):
         with open(review_file, "w", encoding="utf-8") as f:
             json.dump(existing_data, f, ensure_ascii=False, indent=2)
 
-def worker(queue, revision_file, review_file, gpu_id, regulations_dir, base_dir, client, model, coder, num_reflections):
+def worker(
+        queue,
+        regulations_dir: str,
+        base_dir: str,
+        num_reflections: int,
+        model: str,
+        client: Any,
+        client_model: str,
+        draft: bool,
+        review: bool,
+        improvement: bool,
+        gpu_id: int,
+):
     """
     並列実行時に呼ばれるワーカー関数。
     queue から規定を取り出して revise する。
     """
     # 並列実行用にGPU指定を行う
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
-    print(f"Worker started on GPU {gpu_id}.")
+    print(f"Worker {gpu_id} started.")
 
     while True:
         regulation = queue.get()
         if regulation is None:
             break
-        try:
-            do_regulation(regulation, revision_file, review_file, regulations_dir, coder, num_reflections)
-        except Exception as e:
-            print(f"Failed to revise regulation {regulation['title']}: {str(e)}")
 
-    print(f"Worker on GPU {gpu_id} finished.")
+        success = do_regulation(
+            regulation=regulation,
+            regulations_dir=regulations_dir,
+            base_dir=base_dir,
+            num_reflections=num_reflections,
+            model=model,
+            client=client,
+            client_model=client_model,
+            draft=draft,
+            review=review,
+            improvement=improvement,
+            log_file=True,
+        )
+        print(f"Completed regulation: {regulation['path']}, Success: {success}")
+    
+    print(f"Worker {gpu_id} finished.")
 
 def main():
     args = parse_arguments()
@@ -196,11 +348,12 @@ def main():
         base_dir=base_dir,
         client=client,
         model=client_model,
-        num_reflections=NUM_REFLECTIONS,
+        num_reflections=args.num_reflections,
+        skip_list_regulations=args.skip_list_regulations,
     )
     # 規定ファイルを保存（ターゲットとなる規定の一覧）
     with open(os.path.join(base_dir, "target_regulations.json"), "w", encoding="utf-8") as f:
-        json.dump(regulations, f, ensure_ascii=False, indent=2)
+        json.dump(regulations, f, ensure_ascii=False, indent=4)
 
     # 改定要否の確認（改定が必要なものをフィルタリングするなど）
     regs_to_revise = check_revisions(
@@ -209,30 +362,7 @@ def main():
         base_dir=base_dir,
         client=client,
         model=client_model,
-        num_reflections=NUM_REFLECTIONS,
-    )
-
-    # revision.json と review.json の初期化（あれば流用でもよい）
-    revision_file = os.path.join(base_dir, "revision.json")
-    review_file = os.path.join(base_dir, "review.json")
-
-    # すでに存在していれば（前回処理の続きなどを想定し）追記可能だが、
-    # 必要に応じて初期化する場合はコメントアウトを外してください。
-    # if osp.exists(revision_file):
-    #     os.remove(revision_file)
-    # if osp.exists(review_file):
-    #     os.remove(review_file)
-
-    # Coderの初期化（launch_scientist.pyを参照）
-    io = InputOutput(yes=True, chat_history_file="revision_history.txt")
-    main_model = Model(args.model)
-    coder = Coder.create(
-        main_model=main_model,
-        fnames=[revision_file, review_file],
-        io=io,
-        stream=False,
-        use_git=False,
-        edit_format="diff",
+        num_reflections=args.num_reflections,
     )
 
     # 並列実行モードとシーケンシャルモードの分岐
@@ -251,10 +381,22 @@ def main():
             gpu_id = available_gpus[i % len(available_gpus)]
             p = multiprocessing.Process(
                 target=worker,
-                args=(queue, revision_file, review_file, gpu_id, regulations_dir, base_dir, client, client_model, coder, NUM_REFLECTIONS),
+                args=(
+                    queue, 
+                    regulations_dir, 
+                    base_dir, 
+                    args.num_reflections,
+                    args.model, 
+                    client, 
+                    client_model,
+                    args.draft,
+                    args.review,
+                    args.improvement,
+                    gpu_id, 
+                ),
             )
             p.start()
-            # 必要に応じてワーカー間の起動間隔を入れる (例: time.sleep(2))
+            time.sleep(150)  # ワーカー間の起動間隔
             processes.append(p)
 
         # 終了シグナルを送信
@@ -269,19 +411,30 @@ def main():
     else:
         # シーケンシャル実行
         for reg in regs_to_revise:
-            try:
-                do_regulation(reg, revision_file, review_file, regulations_dir, coder, NUM_REFLECTIONS)
-            except Exception as e:
-                print(f"Failed to revise regulation {reg['title']}: {str(e)}")
+            success = do_regulation(
+                regulation=reg,
+                regulations_dir=regulations_dir,
+                base_dir=base_dir,
+                num_reflections=args.num_reflections,
+                model=args.model,
+                client=client,
+                client_model=client_model,
+                draft=args.draft,
+                review=args.review,
+                improvement=args.improvement,
+                log_file=True,
+            )
+            if not success:
+                print(f"Failed to revise regulation {reg['path']}")
 
     # すべての改定提案が完了した後にレポートを生成
     # revision.json と review.json の内容を踏まえてレポート作成
-    generate_report(
-        revision_file=revision_file,
-        review_file=review_file,
-        md_report="revision_report.md",
-        pdf_report="revision_report.pdf"
-    )
+    # generate_report(
+    #     # revision_file=revision_file,
+    #     # review_file=review_file,
+    #     md_report="revision_report.md",
+    #     pdf_report="revision_report.pdf"
+    # )
 
     print("All regulations revised. Final report generated.")
 
