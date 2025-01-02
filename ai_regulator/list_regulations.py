@@ -2,6 +2,7 @@ import os
 import os.path as osp
 import json
 from typing import List, Dict, Any
+from pypdf import PdfReader
 
 from ai_regulator.llm import get_response_from_llm, extract_json_between_markers, create_client, AVAILABLE_LLMS
 
@@ -311,8 +312,23 @@ def check_revisions(
             continue
 
         print(f"[check_revisions] Starting revision check for: {rel_path}")
-        with open(full_path, "r", encoding="utf-8") as f:
-            regulation_content = f.read()
+        try:
+            if rel_path.lower().endswith('.pdf'):
+                # PDFファイルの場合
+                reader = PdfReader(full_path)
+                regulation_content = ''
+                for page in reader.pages:
+                    regulation_content += page.extract_text() + '\n'
+            else:
+                # 通常のテキストファイルの場合
+                with open(full_path, "r", encoding="utf-8") as f:
+                    regulation_content = f.read()
+        except Exception as e:
+            print(f"[check_revisions] Error reading file {rel_path}: {str(e)}")
+            reg["revision_needed"] = False
+            reg["comment"] = f"Error reading file: {str(e)}"
+            updated_list.append(reg)
+            continue
 
         # --- Step 1: 初回呼び出し ---
         msg_history = []
