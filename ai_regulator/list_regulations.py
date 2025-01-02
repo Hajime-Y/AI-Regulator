@@ -69,7 +69,7 @@ LIST_REGULATIONS_REFLECTION_PROMPT = """Round {current_round}/{num_reflections}.
 THOUGHT:
 <THOUGHT>
 
-NEW IDEA JSON:
+CHECK RESULT JSON:
 ```json
 <JSON>
 ```
@@ -115,8 +115,8 @@ CHECK RESULT JSON:
 その後、具体的に規定集内の章ごとに改定の必要性を確認してください。
 
 <JSON>では、以下のフィールドを含むJSONフォーマットで確認の必要性を提供してください：
-- "revision_needed": 改定が必要かどうか。（True or False）
-- "comment": 改定の必要性に関するコメント。改定が必要となった場合、コメントに改定が必要な箇所を洗い出す。後続の改定実施者に伝えられる。
+- "revision_needed": 改定が必要かどうか。（true or false）
+- "comment": 改定の必要性に関するコメント(String形式)。改定が必要となった場合、コメントに改定が必要な箇所を洗い出す。後続の改定実施者に伝えられる。
 
 このJSONは自動的に解析されるため、フォーマットは正確である必要があります。
 規定改定の必要性確認のために{num_reflections}回のラウンドがありますが、すべてを使用する必要はありません。
@@ -283,8 +283,9 @@ def check_revisions(
     3. 結果を各規定に付与する。
     4. 結果を target_regulations.json として保存し、リストを返す。
     """
+    # 改定対象規定ファイル
+    target_regulations_file = osp.join(base_dir, "target_regulations.json")
     if not target_regulations:
-        target_regulations_file = osp.join(base_dir, "target_regulations.json")
         if not osp.exists(target_regulations_file):
             print("[check_revisions] No target_regulations provided and no file found.")
             return []
@@ -349,12 +350,6 @@ def check_revisions(
             msg_history=msg_history,
         )
         raw_json = extract_json_between_markers(text)
-        if raw_json is None:
-            print(f"[check_revisions] Failed to extract JSON for: {rel_path}")
-            reg["revision_needed"] = False
-            reg["comment"] = "Failed to parse JSON."
-            updated_list.append(reg)
-            continue
 
         # --- Step 2: Reflection ---
         final_json = raw_json
@@ -386,6 +381,7 @@ def check_revisions(
 
         # --- Step 3: 最終JSONをパース & 書き込み ---
         if final_json is None:
+            print(f"[check_revisions] Failed to extract JSON for: {rel_path}")
             reg["revision_needed"] = False
             reg["comment"] = "No valid JSON found"
         else:
