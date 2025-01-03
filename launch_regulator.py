@@ -176,7 +176,7 @@ def do_regulation(
                 regulations_dir=regulations_dir,
                 base_dir=folder_name,
                 coder=coder,
-                out_file=revision_file,
+                revision_file=revision_file,
                 num_reflections=num_reflections,
             )
             if not draft_res:
