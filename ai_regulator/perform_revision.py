@@ -2,6 +2,7 @@ import os
 import os.path as osp
 import json
 from typing import Dict, Any, List, Optional
+from pypdf import PdfReader
 
 from aider.coders import Coder
 from aider.models import Model
@@ -147,8 +148,20 @@ def draft_revision(
         print(f"[draft_revision] Regulation file not found: {full_path}")
         return []
 
-    with open(full_path, "r", encoding="utf-8") as f:
-        regulation_content = f.read()
+    try:
+        if rel_path.lower().endswith('.pdf'):
+            # PDFファイルの場合
+            reader = PdfReader(full_path)
+            regulation_content = ''
+            for page in reader.pages:
+                regulation_content += page.extract_text() + '\n'
+        else:
+            # 通常のテキストファイルの場合
+            with open(full_path, "r", encoding="utf-8") as f:
+                regulation_content = f.read()
+    except Exception as e:
+        print(f"[draft_revision] Error reading file {rel_path}: {str(e)}")
+        return []
 
     # 改定コメント
     comment = regulation.get('comment', '')
@@ -311,6 +324,7 @@ if __name__ == "__main__":
                 draft_res = draft_revision(
                     regulation=regulation,
                     regulations_dir=args.regulations_dir,
+                    base_dir=args.base_dir,
                     coder=coder,
                     revision_file=revision_file,
                     num_reflections=args.num_reflections
@@ -321,5 +335,3 @@ if __name__ == "__main__":
 
             if not draft_res:
                 print(f"[draft_revision] 規定 {regulation.get('path', '不明')} の改定案生成に失敗しました。")
-
-
