@@ -62,7 +62,13 @@ DRAFT_REVISION_USER_PROMPT = """プロジェクトに `revision.json` ファイ�
 """
 
 DRAFT_REVISION_REFLECTION_PROMPT = """Round {current_round}/{num_reflections}.
-先ほど生成した改定案(複数のペア)を精査し、必要であれば修正してください。
+先ほど生成した改定案(複数のペア)を以下の観点で精査し、必要であれば修正してください。
+
+ - 引用: 改定前の文面は改変されていないか
+ - フォーマット: 規定集の形式を適切に維持しているか
+ - 修正範囲: 改定箇所は可能な限り必要最低限となっているか
+ - 一貫性: 規定集の役割・目的との整合しているか
+ - 完全性: 変更情報の内容を漏れなく改定に反映しているか
 
 もし修正が必要であれば、ファイルは再度同じjson形式としてください：
 ```json
@@ -73,7 +79,13 @@ original_textは、改定前の文面であり、regulation_contentに存在す�
 改定箇所は可能な限り必要最低限とし、現状更新情報に関連のない箇所に不必要に情報を追加しようとはしないでください。
 改定箇所がない場合は、空のリストをファイルに出力してください。
 
-もし修正が不要なら、以下のような変更なしの *SEARCH/REPLACE* ブロックを返してください。
+もし修正が不要なら、以下のような変更なしの *SEARCH/REPLACE* ブロックを返します。
+revision.json
+```python
+<<<<<<< SEARCH
+=======
+>>>>>>> REPLACE
+```
 
 必ずファイル名を最初に指定し、これらの編集を行うために *SEARCH/REPLACE* ブロックを使用してください。
 """
@@ -92,31 +104,6 @@ JSON_FORMAT_FIX_PROMPT = """{error_text}
 ```
 """
 
-DRAFT_REVISION_FIX_PROMPT = """改定前の文面（original_text）が実際のファイル内容と一致していません。改定案を修正してください。
-original_textは、改定前の文面であり、regulation_contentに存在する文章を改行も含めて必ずそのまま引用する必要があります。
-
-以下が見つからなかった改定前の文面（original_text）です。
-{not_found_texts}
-
-必ずファイル名を最初に指定し、これらの編集を行うために *SEARCH/REPLACE* ブロックを使用してください。
-"""
-
-def _check_revision(
-        draft: List[Dict[str, str]], 
-        regulation_content: str
-) -> List[str]:
-    """
-    機械的に検証する関数。
-    draft に含まれる "original_text" が必ず regulation_content に そのまま（完全一致で）含まれているかをチェックする。
-    完全一致とならなかった original_text のリストを返す。
-    すべて含まれていれば空のリストを返す。
-    """
-    not_found = []
-    for item in draft:
-        original_text = item.get("original_text", "")
-        if original_text.replace("\n", "") not in regulation_content.replace("\n", ""):
-            not_found.append(original_text)
-    return not_found
 
 def draft_revision(
         regulation: Dict[str, Any],
@@ -235,7 +222,6 @@ def draft_revision(
     # --- Step 3: 最終チェック ---
     max_tries = 3
     json_check_success = False
-    text_check_success = False
     final_checked_data = None
 
     # JSON形式のチェック
@@ -243,7 +229,7 @@ def draft_revision(
         fix_prompt = ""
         try:
             with open(revision_file, "r", encoding="utf-8") as f:
-                final_data = json.load(f)
+                final_checked_data = json.load(f)
             json_check_success = True
             break
         except FileNotFoundError:
@@ -267,27 +253,6 @@ def draft_revision(
 
     if not json_check_success:
         print("[draft_revision] Final json format check failed after 3 attempts.")
-        return []
-
-    # 機械的チェック：original_textがregulation_contentに含まれているかをチェック
-    for attempt in range(max_tries):
-        not_found_texts = _check_revision(final_data, regulation_content)
-        if not not_found_texts:  # 空のリストの場合は成功
-            text_check_success = True
-            final_checked_data = final_data
-            break
-        else:
-            print(f"[draft_revision] _check_revision failed on attempt {attempt+1}, retrying...")
-            # 見つからなかったテキストを含めて再生成を試みる
-            not_found_texts = "\n".join([f"- {text}" for text in not_found_texts])
-            fix_prompt = DRAFT_REVISION_FIX_PROMPT.format(
-                regulation_content=regulation_content,
-                not_found_texts=not_found_texts,
-            )
-            coder_out = coder.run(fix_prompt)
-
-    if not text_check_success:
-        print("[draft_revision] Final text check failed after 3 attempts.")
         return []
 
     print(f"[draft_revision] Successfully wrote draft revision to {revision_file}")
