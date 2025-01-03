@@ -13,8 +13,9 @@ from aider.models import Model
 
 DRAFT_REVISION_SYSTEM_PROMPT = """あなたは銀行規定の改定を行うAIアシスタントです。
 以下に示す「改定に関する銀行規定等の変更情報(update_info)」「規定集の内容(regulation_content)」と別の人が作成した「改定が必要だと考えられる理由・箇所(reason_and_comment)」に基づき、
-(1) 改定前の文面 (original_text) と
-(2) 改定後の文面 (revised_text)
+(1) セクション名
+(2) 改定前の文面 (original_text) 
+(3) 改定後の文面 (revised_text)
 のペアを複数リスト形式で生成してください。
 
 規定改定案作成のために{num_reflections}回のラウンドが与えられますが、すべてを使用する必要はありません。
@@ -42,6 +43,7 @@ DRAFT_REVISION_USER_PROMPT = """プロジェクトに `revision.json` ファイ�
 ```json
 [
   {{
+    "section_name": "...",
     "original_text": "...",
     "revised_text": "..."
   }},
@@ -50,6 +52,7 @@ DRAFT_REVISION_USER_PROMPT = """プロジェクトに `revision.json` ファイ�
 ```
 
 ファイルは、以下のフィールドを含むJSONフォーマットで確認の必要性を提供してください：
+ - section_name: セクション名はregulation_contentのセクション名を必ずそのまま引用してください（改変しない）。
  - original_text: 改定前の文面はregulation_contentの文章を改行も含めて必ずそのまま引用してください（改変しない）。
  - revised_text: 改定後の文面は省略せず、提案する改定案を正確に書いてください。
  
@@ -78,6 +81,7 @@ JSON_FORMAT_FIX_PROMPT = """{error_text}
 ```json
 [
   {{
+    "section_name": "...",
     "original_text": "...",
     "revised_text": "..."
   }},
