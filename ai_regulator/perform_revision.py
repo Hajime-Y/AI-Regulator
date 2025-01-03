@@ -125,7 +125,7 @@ def draft_revision(
         (1)改定前文面(original_text) と
         (2)改定後文面(revised_text) を複数ペア生成させる。
     3. Reflectionを行い、再度生成を改良させる。（num_reflections回）
-    4. 最終的な生成結果に対して _check_revision を呼び出し、original_text がファイル内に含まれていない場合は再生成（最大3回まで再試行）。
+    4. 最終的な生成結果に対してファイルがjson形式となっているか確認。エラーとなる場合には再生成（最大3回まで再試行）。
     5. 成功したら最終リストを返す。
     
     戻り値:
