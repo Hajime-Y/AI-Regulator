@@ -263,16 +263,18 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Generate revision proposals for regulations")
     parser.add_argument("--regulations-dir", type=str, required=True, help="Directory containing regulation files")
-    parser.add_argument("--target-file", type=str, required=True, help="JSON file containing target regulations for revision")
-    parser.add_argument("--revision-file", type=str, required=True, help="Output JSON file for revision proposals")
+    parser.add_argument("--target-file", type=str, required=False, help="JSON file containing target regulations for revision")
     parser.add_argument("--base_dir", type=str, required=True, help="Path to the base directory")
     parser.add_argument("--model", type=str, default="gpt-4o-2024-05-13", help="LLM model to use")
     parser.add_argument("--num-reflections", type=int, default=3, help="Number of reflection rounds")
     args = parser.parse_args()
 
+    # target_fileのパスを決定
+    target_file = args.target_file if args.target_file else osp.join(args.base_dir, "target_regulations.json")
+
     # 対象規定の読み込み
     try:
-        with open(args.target_file, "r", encoding="utf-8") as f:
+        with open(target_file, "r", encoding="utf-8") as f:
             target_regulations = json.load(f)
     except Exception as e:
         print(f"対象規定ファイルの読み込みに失敗しました: {e}")
@@ -310,7 +312,7 @@ if __name__ == "__main__":
                     regulation=regulation,
                     regulations_dir=args.regulations_dir,
                     coder=coder,
-                    revision_file=args.revision_file,
+                    revision_file=revision_file,
                     num_reflections=args.num_reflections
                 )
             except Exception as e:
