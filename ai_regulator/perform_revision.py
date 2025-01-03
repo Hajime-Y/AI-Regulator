@@ -263,8 +263,8 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Generate revision proposals for regulations")
     parser.add_argument("--regulations-dir", type=str, required=True, help="Directory containing regulation files")
+    parser.add_argument("--base-dir", type=str, required=True, help="Path to the base directory")
     parser.add_argument("--target-file", type=str, required=False, help="JSON file containing target regulations for revision")
-    parser.add_argument("--base_dir", type=str, required=True, help="Path to the base directory")
     parser.add_argument("--model", type=str, default="gpt-4o-2024-05-13", help="LLM model to use")
     parser.add_argument("--num-reflections", type=int, default=3, help="Number of reflection rounds")
     args = parser.parse_args()
