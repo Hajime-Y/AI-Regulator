@@ -17,9 +17,6 @@ DRAFT_REVISION_SYSTEM_PROMPT = """あなたは銀行規定の改定を行うAI�
 (2) 改定前の文面 (original_text) 
 (3) 改定後の文面 (revised_text)
 のペアを複数リスト形式で生成してください。
-
-規定改定案作成のために{num_reflections}回のラウンドが与えられますが、すべてを使用する必要はありません。
-どのラウンドでも、早期に終了して規定改定案作成完了の判断を下すことができます。
 """
 
 DRAFT_REVISION_USER_PROMPT = """プロジェクトに `revision.json` ファイルを用意しました。
