@@ -50,9 +50,9 @@ DRAFT_REVISION_USER_PROMPT = """プロジェクトに `revision.json` ファイ�
 ```
 
 ファイルは、以下のフィールドを含むJSONフォーマットで確認の必要性を提供してください：
- - original_text: 改定前の文面は規定集のファイル内に存在する文章をそのまま引用してください（改変しない）。
+ - original_text: 改定前の文面はregulation_contentの文章を改行も含めて必ずそのまま引用してください（改変しない）。
  - revised_text: 改定後の文面は省略せず、提案する改定案を正確に書いてください。
-
+ 
 このJSONは自動的に解析されるため、フォーマットは正確である必要があります。
 
 必ずファイル名を最初に指定し、これらの編集を行うために *SEARCH/REPLACE* ブロックを使用してください。
@@ -66,18 +66,34 @@ DRAFT_REVISION_REFLECTION_PROMPT = """Round {current_round}/{num_reflections}.
 <JSON>
 ```
 
+original_textは、改定前の文面であり、regulation_contentに存在する文章を改行も含めて必ずそのまま引用してください（改変しない）。
+
 もし修正が不要なら、以下のような変更なしの *SEARCH/REPLACE* ブロックを返してください。
 
 必ずファイル名を最初に指定し、これらの編集を行うために *SEARCH/REPLACE* ブロックを使用してください。
 """
 
+JSON_FORMAT_FIX_PROMPT = """{error_text}
+ファイルは必ず以下のようなjson形式である必要があります。。
+```json
+[
+  {{
+    "original_text": "...",
+    "revised_text": "..."
+  }},
+  ...
+]
+```
+"""
+
 DRAFT_REVISION_FIX_PROMPT = """改定前の文面（original_text）が実際のファイル内容と一致していません。改定案を修正してください。
+original_textは、改定前の文面であり、regulation_contentに存在する文章を改行も含めて必ずそのまま引用する必要があります。
 
 <regulation_content>
 {regulation_content}
 </regulation_content>
 
-以下が見つからなかったテキストです。
+以下が見つからなかった改定前の文面（original_text）です。
 {not_found_texts}
 
 必ずファイル名を最初に指定し、これらの編集を行うために *SEARCH/REPLACE* ブロックを使用してください。
@@ -96,7 +112,7 @@ def _check_revision(
     not_found = []
     for item in draft:
         original_text = item.get("original_text", "")
-        if not original_text or original_text not in regulation_content:
+        if original_text.replace("\n", "") not in regulation_content.replace("\n", ""):
             not_found.append(original_text)
     return not_found
 
@@ -233,10 +249,19 @@ def draft_revision(
             break
         except json.JSONDecodeError as e:
             print(f"[draft_revision] JSON parse error on attempt {attempt+1}: {e}")
-            fix_prompt += f"JSONパースエラーが発生しました。修正してください。\n{e}\n\nまた、"
+            error_text = f"JSONパースエラーが発生しました。修正してください。\n{e}\n"
+            fix_prompt += JSON_FORMAT_FIX_PROMPT.format(
+                error_text=error_text
+            ).replace(r"{{", "{").replace(r"}}", "}")
         except Exception as e:
             print(f"[draft_revision] Unexpected error on attempt {attempt+1}: {e}")
-            fix_prompt += f"予期せぬエラーが発生しました。修正してください。\n{e}\n\nまた、"
+            error_text = f"予期せぬエラーが発生しました。修正してください。\n{e}\n"
+            fix_prompt += JSON_FORMAT_FIX_PROMPT.format(
+                error_text=error_text
+            ).replace(r"{{", "{").replace(r"}}", "}")
+
+        # 修正を行う
+        coder_out = coder.run(fix_prompt)
 
     if not json_check_success:
         print("[draft_revision] Final json format check failed after 3 attempts.")
@@ -257,7 +282,7 @@ def draft_revision(
                 regulation_content=regulation_content,
                 not_found_texts=not_found_texts,
             )
-            coder.run(fix_prompt)
+            coder_out = coder.run(fix_prompt)
 
     if not text_check_success:
         print("[draft_revision] Final text check failed after 3 attempts.")
@@ -335,3 +360,5 @@ if __name__ == "__main__":
 
             if not draft_res:
                 print(f"[draft_revision] 規定 {regulation.get('path', '不明')} の改定案生成に失敗しました。")
+            else:
+                print(f"[draft_revision] 規定 {regulation.get('path', '不明')} の改定案を生成しました。")
