@@ -118,23 +118,9 @@ REVIEW JSON:
 IMPROVE_REVISION_SYSTEM_PROMPT = """あなたは銀行規定の改定を行うAIアシスタントです。
 以下に示す「改定案（original_text → revised_text の複数ペア）」と「レビュー内容」を踏まえて、改定案を再編集してください。
 特にレビューで指摘された問題点を改善し、より優れた改定案にしてください。なお、
-(1)改定前文面(original_text) は必ず規定ファイルそのままを保持してください。
-(2)改定後文面(revised_text) はレビューコメントの内容を適切に取り入れて修正してください。
-
-出力形式は以下のとおりにしてください:
-THOUGHT:
-<THOUGHT>
-
-IMPROVED REVISION JSON:
-```json
-[
-  {{
-    "original_text": "...",
-    "revised_text": "..."
-  }},
-  ...
-]
-```
+(1)改定前文面(original_text) は必ず規定ファイルそのままを保持
+(2)改定後文面(revised_text) はレビューコメントの内容を適切に取り入れて修正
+としてください。
 """
 
 IMPROVE_REVISION_USER_PROMPT = """以下の情報を基に、改定案の改善を行ってください。
@@ -148,7 +134,7 @@ IMPROVE_REVISION_USER_PROMPT = """以下の情報を基に、改定案の改善�
 </review_result>
 
 改定案(1)original_textは規定ファイルの内容をそのまま、 (2)revised_textはレビュー指摘を反映した修正案を提示してください。
-出力フォーマット:
+出力形式は以下のとおりにしてください:
 
 THOUGHT:
 <THOUGHT>
@@ -376,7 +362,7 @@ def improve_revision(
     user_msg = IMPROVE_REVISION_USER_PROMPT.format(
         current_draft_revision=current_draft_str,
         review_result=review_str,
-    )
+    ).replace(r"{{", "{").replace(r"}}", "}")
 
     print("[improve_revision] Generating improved revision...")
 

@@ -105,7 +105,7 @@ def draft_revision(
     """
     1. regulation(dict) は target_regulations.json から取得した一要素:
         {
-            "path": "xxx/yyy.txt",
+            "path": "xxx/yyy.pdf",
             "reason": "...",
             "revision_needed": bool,
             "comment": "..."

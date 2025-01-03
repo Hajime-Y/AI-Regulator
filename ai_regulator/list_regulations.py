@@ -196,7 +196,7 @@ def list_regulations(
     user_message = LIST_REGULATIONS_USER_PROMPT.format(
         toc_content=toc_content,
         update_info=update_info,
-    )
+    ).replace(r"{{", "{").replace(r"}}", "}")
 
     print("[list_regulations] Generating target regulations (initial call)...")
     text, msg_history = get_response_from_llm(
