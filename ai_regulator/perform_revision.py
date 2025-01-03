@@ -259,28 +259,16 @@ if __name__ == "__main__":
     from aider.models import Model
     from aider.io import InputOutput
     import argparse
+    from datetime import datetime
 
-    parser = argparse.ArgumentParser(description="規定改定案の生成を行います")
-    parser.add_argument("--regulations-dir", type=str, required=True, help="規定ファイルが格納されているディレクトリ")
-    parser.add_argument("--target-file", type=str, required=True, help="改定対象の規定を記載したJSONファイル")
-    parser.add_argument("--revision-file", type=str, required=True, help="改定案の出力先JSONファイル")
-    parser.add_argument("--model", type=str, default="gpt-4", help="使用するLLMモデル")
-    parser.add_argument("--num-reflections", type=int, default=3, help="リフレクションの回数")
+    parser = argparse.ArgumentParser(description="Generate revision proposals for regulations")
+    parser.add_argument("--regulations-dir", type=str, required=True, help="Directory containing regulation files")
+    parser.add_argument("--target-file", type=str, required=True, help="JSON file containing target regulations for revision")
+    parser.add_argument("--revision-file", type=str, required=True, help="Output JSON file for revision proposals")
+    parser.add_argument("--base_dir", type=str, required=True, help="Path to the base directory")
+    parser.add_argument("--model", type=str, default="gpt-4o-2024-05-13", help="LLM model to use")
+    parser.add_argument("--num-reflections", type=int, default=3, help="Number of reflection rounds")
     args = parser.parse_args()
-
-    # 入出力の設定
-    io = InputOutput(yes=True, chat_history_file="revision_history.txt")
-    main_model = Model(args.model)
-    
-    # Coderの初期化
-    coder = Coder.create(
-        main_model=main_model,
-        fnames=[args.target_file],
-        io=io,
-        stream=False,
-        use_git=False,
-        edit_format="diff",
-    )
 
     # 対象規定の読み込み
     try:
@@ -293,6 +281,30 @@ if __name__ == "__main__":
     # 各規定について改定案を生成
     for regulation in target_regulations:
         if regulation.get("revision_needed", False):
+            # regulation_nameを生成（pathから拡張子なしのファイル名を取得）
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            regulation_name = os.path.splitext(os.path.basename(regulation["path"]))[0] + "_" + timestamp
+            folder_name = osp.join(args.base_dir, regulation_name)
+            
+            # フォルダ作成とファイルパス設定
+            os.makedirs(folder_name, exist_ok=True)
+            revision_file = osp.join(folder_name, "revision.json")
+
+            # 入出力の設定
+            io = InputOutput(yes=True, chat_history_file=f"{folder_name}/revision_history.txt")
+            main_model = Model(args.model)
+            
+            # Coderの初期化
+            coder = Coder.create(
+                main_model=main_model,
+                fnames=[revision_file],
+                io=io,
+                stream=False,
+                use_git=False,
+                edit_format="diff",
+            )
+
+            # 改定案生成
             try:
                 draft_res = draft_revision(
                     regulation=regulation,
