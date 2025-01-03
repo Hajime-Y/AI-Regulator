@@ -98,10 +98,6 @@ JSON_FORMAT_FIX_PROMPT = """{error_text}
 DRAFT_REVISION_FIX_PROMPT = """改定前の文面（original_text）が実際のファイル内容と一致していません。改定案を修正してください。
 original_textは、改定前の文面であり、regulation_contentに存在する文章を改行も含めて必ずそのまま引用する必要があります。
 
-<regulation_content>
-{regulation_content}
-</regulation_content>
-
 以下が見つからなかった改定前の文面（original_text）です。
 {not_found_texts}
 
