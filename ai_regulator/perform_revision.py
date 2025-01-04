@@ -61,35 +61,6 @@ DRAFT_REVISION_USER_PROMPT = """プロジェクトに `revision.json` ファイ�
 必ずファイル名を最初に指定し、これらの編集を行うために *SEARCH/REPLACE* ブロックを使用してください。
 """
 
-DRAFT_REVISION_REFLECTION_PROMPT = """Round {current_round}/{num_reflections}.
-先ほど生成した改定案(複数のペア)を以下の観点で精査し、必要であれば修正してください。
-
- - 引用: 改定前の文面は改変されていないか
- - フォーマット: 規定集の形式を適切に維持しているか
- - 修正範囲: 改定箇所は可能な限り必要最低限となっているか
- - 一貫性: 規定集の役割・目的との整合しているか
- - 完全性: 変更情報の内容を漏れなく改定に反映しているか
-
-もし修正が必要であれば、ファイルは再度同じjson形式としてください：
-```json
-<JSON>
-```
-
-original_textは、改定前の文面であり、regulation_contentに存在する文章を改行も含めて必ずそのまま引用してください（改変しない）。
-改定箇所は可能な限り必要最低限とし、現状更新情報に関連のない箇所に不必要に情報を追加しようとはしないでください。
-改定箇所がない場合は、空のリストをファイルに出力してください。
-
-もし修正が不要なら、以下のような変更なしの *SEARCH/REPLACE* ブロックを返します。
-revision.json
-```python
-<<<<<<< SEARCH
-=======
->>>>>>> REPLACE
-```
-
-必ずファイル名を最初に指定し、これらの編集を行うために *SEARCH/REPLACE* ブロックを使用してください。
-"""
-
 JSON_FORMAT_FIX_PROMPT = """{error_text}
 ファイルは必ず以下のようなjson形式である必要があります。。
 ```json
@@ -133,7 +104,6 @@ def draft_revision(
         base_dir: str,
         coder: Coder,
         revision_file: str,
-        num_reflections: int = 1,
 ) -> List[Dict[str, str]]:
     """
     1. regulation(dict) は target_regulations.json から取得した一要素:
@@ -146,9 +116,8 @@ def draft_revision(
     2. pathを元に規定ファイルを読み込み、LLM(Coder)に
         (1)改定前文面(original_text) と
         (2)改定後文面(revised_text) を複数ペア生成させる。
-    3. Reflectionを行い、再度生成を改良させる。（num_reflections回）
-    4. 最終的な生成結果に対してファイルがjson形式となっているか確認。エラーとなる場合には再生成（最大3回まで再試行）。
-    5. 成功したら最終リストを返す。
+    3. 最終的な生成結果に対してファイルがjson形式となっているか確認。エラーとなる場合には再生成（最大3回まで再試行）。
+    4. 成功したら最終リストを返す。
     
     戻り値:
     [
@@ -202,46 +171,12 @@ def draft_revision(
     ).replace(r"{{", "{").replace(r"}}", "}")
 
     # Coderを用いてプロンプトを実行 (LLM呼び出し)
-    print("[draft_revision] Generating initial draft revision...")
+    print("[draft_revision] Generating draft revision...")
     coder_out = coder.run(
         f"{system_msg}\n\n{user_prompt}"
     )
 
-    # revision_fileをテキストとして読み込む
-    revision_text = ""
-    try:
-        if osp.exists(revision_file):
-            with open(revision_file, "r", encoding="utf-8") as f:
-                revision_text = f.read()
-    except Exception:
-        revision_text = ""
-
-    # --- Step 2: Reflection (num_reflections - 1回) ---
-    final_revision_text = revision_text
-    for r in range(num_reflections - 1):
-        # reflection prompt
-        reflection_prompt = DRAFT_REVISION_REFLECTION_PROMPT.format(
-            current_round=r+2,
-            num_reflections=num_reflections,
-        )
-
-        # Reflection with coder
-        coder_out = coder.run(reflection_prompt)
-
-        # revision_fileをテキストとして読み込む
-        revision_text = ""
-        try:
-            if osp.exists(revision_file):
-                with open(revision_file, "r", encoding="utf-8") as f:
-                    revision_text = f.read()
-        except Exception:
-            revision_text = ""
-
-        # 変更がなければbreak
-        if final_revision_text == revision_text:
-            break
-
-    # --- Step 3: 最終チェック ---
+    # --- Step 2: 最終チェック ---
     max_tries = 3
     json_check_success = False
     final_checked_data = None
@@ -293,7 +228,6 @@ if __name__ == "__main__":
     parser.add_argument("--base-dir", type=str, required=True, help="Path to the base directory")
     parser.add_argument("--target-file", type=str, required=False, help="JSON file containing target regulations for revision")
     parser.add_argument("--model", type=str, default="gpt-4o-2024-05-13", help="LLM model to use")
-    parser.add_argument("--num-reflections", type=int, default=3, help="Number of reflection rounds")
     args = parser.parse_args()
 
     # target_fileのパスを決定
@@ -341,7 +275,6 @@ if __name__ == "__main__":
                     base_dir=args.base_dir,
                     coder=coder,
                     revision_file=revision_file,
-                    num_reflections=args.num_reflections
                 )
             except Exception as e:
                 print(f"規定 {regulation.get('path', '不明')} の改定案生成に失敗しました: {e}")
