@@ -190,7 +190,6 @@ def do_regulation(
                 base_dir=base_dir,
                 coder=coder,
                 revision_file=revision_file,
-                num_reflections=num_reflections,
             )
             if not draft_res:
                 print(f"[draft_revision] 規定 {regulation['path']} の改定案生成に失敗しました。")
