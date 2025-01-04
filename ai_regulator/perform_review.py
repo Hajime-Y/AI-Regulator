@@ -32,6 +32,7 @@ REVIEW_FORM = """
    - 文書構造は一貫していますか？
    - 用語の使用は統一されていますか？
    - 規定特有の表現や形式は保持されていますか？
+   - 「一部のみ変更」「当面の間」「なお～のままです」など、変更過程や状態の一時性を説明する不要な文言が含まれていませんか？
 
 2. 削除チェック(Removal Check)：不要な削除がないことを確認して建設的なフィードバックを提供してください
    - 重要な条項や文言が欠落していませんか？
@@ -41,6 +42,7 @@ REVIEW_FORM = """
 3. 一貫性評価(Consistency Check)：規定集の役割・目的との整合性を確認して建設的なフィードバックを提供してください
    - 規定の本来の意図は保持されていますか？
    - 元の規定文にない情報を不必要に追加していませんか？
+   - 規定は現在の状態のみを記述し、変更過程や移行期間に関する説明を避けていますか？
 
 4. 完全性評価(Completeness Check)：改定理由と更新者のコメントの反映を確認して建設的なフィードバックを提供してください
    - 改定理由に示された課題は適切に対処されていますか？
@@ -119,6 +121,23 @@ REVIEW JSON:
 
 もし修正が不要なら、THOUGHTの末尾に "I am done" と書き、そのあとに前回と全く同じJSONをそのまま出力してください。
 "I am done" は変更を加えない場合のみ含めてください。
+"""
+
+IMPROVE_REVISION_SYSTEM_PROMPT = """あなたは銀行規定の改定を行うAIアシスタントです。
+規定とは、銀行の取引やサービスに関する現在のルール・規則を定めた文書です。
+
+以下に示す「改定に関する銀行規定等の変更情報(update_info)」「規定集の内容(regulation_content)」と別の人が作成した「改定が必要だと考えられる理由・箇所(reason_and_comment)」に基づき、
+(1) セクション名
+(2) 改定前の文面 (original_text) 
+(3) 改定後の文面 (revised_text)
+のペアを複数リスト形式で渡されます。レビュー結果を元にこれを改善してください。
+
+重要な注意事項：
+- 規定は現在の状態のみを記述してください。「一部のみ変更」「当面の間」「なお～のままです」など、変更過程や状態の一時性を説明する文言は含めないでください。
+- 例：
+  × 「なお、支店窓口での手続きは従来通りとなります。」
+  ○ 「手続きは、インターネットバンキングまたは支店窓口で受け付けます。」
+- 移行期間や変更に関する説明は、規定本文ではなく別途の通知文書で伝えるべき内容です。
 """
 
 IMPROVE_REVISION_USER_PROMPT = """プロジェクトに `revision.json` ファイルを用意しました。
@@ -506,13 +525,16 @@ def improve_revision(
     # レビュー結果をテキスト形式に変換
     review_result_text = format_review_result(review_data)
     
-    improve_prompt = IMPROVE_REVISION_USER_PROMPT.format(
+    system_prompt = IMPROVE_REVISION_SYSTEM_PROMPT
+    user_prompt = IMPROVE_REVISION_USER_PROMPT.format(
         review_result=review_result_text,
     ).replace(r"{{", "{").replace(r"}}", "}")
 
     # Coderを用いてプロンプトを実行
     print("[improve_revision] Generating improved revision...")
-    coder_out = coder.run(improve_prompt)
+    coder_out = coder.run(
+        f"{system_prompt}\n\n{user_prompt}"
+    )
 
     # --- Step 2: 最終チェック ---
     max_tries = 3

@@ -244,7 +244,6 @@ def do_regulation(
                 current_draft=draft_res,
                 review_data=review_res,
                 coder=coder,
-                num_reflections=num_reflections,
                 revision_file=revision_file,
             )
             if not improved_res:
@@ -259,7 +258,7 @@ def do_regulation(
                 regulation=regulation,
                 draft_revision=improved_res,
                 regulations_dir=regulations_dir,
-                base_dir=folder_name,
+                base_dir=base_dir,
                 model=client_model,
                 client=client,
                 num_reflections=num_reflections,
