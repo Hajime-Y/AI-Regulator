@@ -20,7 +20,7 @@ from aider.models import Model
 from ai_regulator.list_regulations import list_regulations, check_revisions
 from ai_regulator.perform_revision import draft_revision
 from ai_regulator.perform_review import review_revision, improve_revision
-# from ai_regulator.generate_report import generate_report
+from ai_regulator.generate_report import generate_report
 from ai_regulator.llm import create_client, AVAILABLE_LLMS
 
 def print_time():
@@ -441,15 +441,20 @@ def main():
                 print(f"Failed to revise regulation {reg['path']}")
 
     # すべての改定提案が完了した後にレポートを生成
-    # revision.json と review.json の内容を踏まえてレポート作成
-    # generate_report(
-    #     # revision_file=revision_file,
-    #     # review_file=review_file,
-    #     md_report="revision_report.md",
-    #     pdf_report="revision_report.pdf"
-    # )
+    print_time()
+    print("[*] Generating final report...")
+    
+    report_content = generate_report(
+        base_dir=base_dir,
+        regulations_file=osp.join(base_dir, "target_regulations.json"),
+        update_info_file=osp.join(base_dir, "update_info.txt"),
+        md_report=osp.join(base_dir, "revision_report.md"),
+        pdf_report=osp.join(base_dir, "revision_report.pdf")
+    )
 
-    print("All regulations revised. Final report generated.")
+    print("[+] Report generation completed.")
+    print(f"    - Markdown report: {osp.join(base_dir, 'revision_report.md')}")
+    print(f"    - PDF report: {osp.join(base_dir, 'revision_report.pdf')}")
 
 if __name__ == "__main__":
     main()
