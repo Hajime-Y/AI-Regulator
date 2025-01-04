@@ -32,12 +32,12 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description="Run AI regulator")
 
     parser.add_argument(
-        "--skip_list_regulations",
+        "--skip-list-regulations",
         action="store_true",
         help="Skip regulation listing and use existing target_regulations.json.",
     )
     parser.add_argument(
-        "--skip_check",
+        "--skip-check",
         action="store_true",
         help="Skip revision check and only list target regulations.",
     )
@@ -48,13 +48,13 @@ def parse_arguments():
         help="Number of parallel processes to run. 0 for sequential execution.",
     )
     parser.add_argument(
-        "--regulations_dir",
+        "--regulations-dir",
         type=str,
         required=True,
         help="Path to the regulations directory.",
     )
     parser.add_argument(
-        "--base_dir",
+        "--base-dir",
         type=str,
         required=True,
         help="Path to the base directory.",
@@ -88,7 +88,7 @@ def parse_arguments():
         help="Comma-separated list of GPU IDs to use (e.g., '0,1,2'). If not specified, all available GPUs will be used.",
     )
     parser.add_argument(
-        "--num_reflections",
+        "--num-reflections",
         type=int,
         default=3,
         help="Number of reflection iterations. Default is 3.",
