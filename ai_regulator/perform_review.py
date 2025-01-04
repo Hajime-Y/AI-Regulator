@@ -28,26 +28,26 @@ REVIEW_FORM = """
 ## レビューフォーム
 規定改定案に対するレビュー時に考慮すべき指針を以下に示します。
 
-1. フォーマット評価(Format Check)：改定案は規定集の形式を適切に維持していますか？
+1. フォーマット評価(Format Check)：改定案は規定集の形式を適切に維持しているか確認して建設的なフィードバックを提供してください
    - 文書構造は一貫していますか？
    - 用語の使用は統一されていますか？
    - 規定特有の表現や形式は保持されていますか？
 
-2. 削除チェック(Removal Check)：不要な削除がないことを確認してください
+2. 削除チェック(Removal Check)：不要な削除がないことを確認して建設的なフィードバックを提供してください
    - 重要な条項や文言が欠落していませんか？
    - 必要な参照や関連規定への言及は維持されていますか？
    - 削除された部分は適切に代替されていますか？
 
-3. 一貫性評価(Consistency Check)：規定集の役割・目的との整合性を評価してください
+3. 一貫性評価(Consistency Check)：規定集の役割・目的との整合性を確認して建設的なフィードバックを提供してください
    - 規定の本来の意図は保持されていますか？
    - 元の規定文にない情報を不必要に追加していませんか？
 
-4. 完全性評価(Completeness Check)：改定理由と更新者のコメントの反映を確認してください
+4. 完全性評価(Completeness Check)：改定理由と更新者のコメントの反映を確認して建設的なフィードバックを提供してください
    - 改定理由に示された課題は適切に対処されていますか？
    - 更新者のコメントは十分に考慮されていますか？
    - 改定の意図が明確に反映されていますか？
 
-5. 総合評価(Overall)：以下の基準に基づいて改定案の総合評価を提供してください：
+5. 総合評価(Overall)：以下の基準に基づいて改定案の総合評価を提供してください
    5: 完璧な改定案：改定は完璧で、規定の目的を完全に達成し、形式も内容も申し分ない
    4: 優れた改定案：改定は優れたものであり、規定の目的を十分に達成し、形式・内容ともに高水準
    3: 良好な改定案：改定は良好で、規定の目的を達成し、重大な問題がない
@@ -91,13 +91,13 @@ REVIEW JSON:
 ここでは一般的なコメントは避け、現在の規定改定案に特化した具体的な内容を書いてください。
 
 <JSON>では、以下のフィールドを含むJSONフォーマットでレビューを提供してください：
- - "format_check": 規定集の形式を適切に維持しているか
- - "removal_check": 不要な削除がないか
- - "consistency_check": 規定集の役割・目的との整合性
- - "completeness_check": 変更情報の内容を漏れなく改定に反映しているか
- - "overall": 1から5の評価（低い、中程度、高い、非常に高い、絶対的）
- - "confidence": 1から5の評価（低い、中程度、高い、非常に高い、絶対的）
- - "comment": 改定案に対するコメントや建設的なフィードバック
+ - "format_check": 規定集の形式を適切に維持しているかの確認結果(string)
+ - "removal_check": 不要な削除がないかの確認結果(string)
+ - "consistency_check": 規定集の役割・目的との整合性の確認結果(string)
+ - "completeness_check": 変更情報の内容を漏れなく改定に反映しているかの確認結果(string)
+ - "overall": 1から5の評価（低い、中程度、高い、非常に高い、絶対的）(int)
+ - "confidence": 1から5の評価（低い、中程度、高い、非常に高い、絶対的）(int)
+ - "comment": 改定案に対するコメントや建設的なフィードバック(string)
 
 このJSONは自動的に解析されるため、フォーマットは正確である必要があります。
 """
@@ -212,13 +212,13 @@ REVIEW JSON:
 ここでは一般的なコメントは避け、現在の規定改定案に特化した具体的な内容を書いてください。
 
 <JSON>では、以下のフィールドを含むJSONフォーマットでレビューを提供してください：
- - "format_check": 規定集の形式を適切に維持しているか
- - "removal_check": 不要な削除がないか
- - "consistency_check": 規定集の役割・目的との整合性
- - "completeness_check": 変更情報の内容を漏れなく改定に反映しているか
- - "overall": 1から5の評価（低い、中程度、高い、非常に高い、絶対的）
- - "confidence": 1から5の評価（低い、中程度、高い、非常に高い、絶対的）
- - "comment": 改定案に対するコメントや建設的なフィードバック
+ - "format_check": 規定集の形式を適切に維持しているかの確認結果(string)
+ - "removal_check": 不要な削除がないかの確認結果(string)
+ - "consistency_check": 規定集の役割・目的との整合性の確認結果(string)
+ - "completeness_check": 変更情報の内容を漏れなく改定に反映しているかの確認結果(string)
+ - "overall": 1から5の評価（低い、中程度、高い、非常に高い、絶対的）(int)
+ - "confidence": 1から5の評価（低い、中程度、高い、非常に高い、絶対的）(int)
+ - "comment": 改定案に対するコメントや建設的なフィードバック(string)
 
 このJSONは自動的に解析されるため、フォーマットは正確である必要があります。
 """
@@ -365,6 +365,11 @@ def review_revision(
                     parsed_reviews.append(review_json)
             except Exception as e:
                 print(f"[review_revision] Ensemble review {idx} failed: {e}")
+
+        # 各レビューの内容を出力
+        for idx, review in enumerate(parsed_reviews):
+            print(f"\n[review_revision] Review {idx + 1}/{len(parsed_reviews)}:")
+            print(json.dumps(review, ensure_ascii=False, indent=2))
         
         # メタレビューの生成
         review = get_meta_review(model, client, temperature, parsed_reviews)
@@ -384,6 +389,10 @@ def review_revision(
                     scores.append(r[score])
             review[score] = int(round(np.mean(scores)))
         
+        # メタレビューの内容を出力
+        print(f"[review_revision] Meta-review:")
+        print(json.dumps(review, ensure_ascii=False, indent=2))
+
         # メッセージ履歴の更新
         msg_history = msg_histories[0][:-1]
         msg_history += [
@@ -429,6 +438,10 @@ REVIEW JSON:
         )
         review = extract_json_between_markers(reflection_output)
 
+        # リフレクションの内容を出力
+        print(f"[review_revision] Reflection {r+2}/{num_reflections}:")
+        print(json.dumps(review, ensure_ascii=False, indent=2))
+
         if "I am done" in reflection_output:
             break
 
@@ -436,6 +449,8 @@ REVIEW JSON:
     if not review:
         print("[review_revision] Failed to extract JSON on initial review.")
         return {}
+    
+    print(f"[review_revision] Successfully generated review")
 
     if return_msg_history:
         return review, msg_history
