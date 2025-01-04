@@ -20,7 +20,7 @@ from aider.models import Model
 from ai_regulator.list_regulations import list_regulations, check_revisions
 from ai_regulator.perform_revision import draft_revision
 from ai_regulator.perform_review import review_revision, improve_revision
-from ai_regulator.generate_report import generate_report
+# from ai_regulator.generate_report import generate_report
 from ai_regulator.llm import create_client, AVAILABLE_LLMS
 
 def print_time():
@@ -367,7 +367,7 @@ def main():
     # skip_list_regulationsがFalseの場合（つまり、list_regulationsが実行された場合）のみ
     # かつ skip_checkがFalseの場合にcheck_revisionsを実行
     if not args.skip_list_regulations and not args.skip_check:
-        regs_to_revise = check_revisions(
+        regulations = check_revisions(
             target_regulations=regulations,
             regulations_dir=regulations_dir,
             base_dir=base_dir,
@@ -375,8 +375,10 @@ def main():
             model=client_model,
             num_reflections=args.num_reflections,
         )
-    else:
-        regs_to_revise = regulations
+
+    # 改定が必要な規定のみに絞り込み
+    regs_to_revise = [reg for reg in regulations if reg.get("revision_needed", False)]
+    print(f"Found {len(regs_to_revise)} regulations that need revision out of {len(regulations)} total regulations")
 
     # 並列実行モードとシーケンシャルモードの分岐
     if args.parallel > 0:
