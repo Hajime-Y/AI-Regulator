@@ -96,6 +96,7 @@ def parse_arguments():
 
     return parser.parse_args()
 
+
 def get_available_gpus(gpu_ids=None):
     """
     使用可能なGPUリストを返すユーティリティ関数
@@ -104,6 +105,7 @@ def get_available_gpus(gpu_ids=None):
     if gpu_ids is not None:
         return [int(gpu_id) for gpu_id in gpu_ids.split(",")]
     return list(range(torch.cuda.device_count()))
+
 
 def do_regulation(
     regulation: Dict[str, Any],
@@ -126,7 +128,24 @@ def do_regulation(
       3. 改定案の改善 (improve_revision) - improvement=True
     結果は revision_file (revision.json) と review_file (review.json) に出力。
     """
-    # ログファイル用の標準出力・標準エラー出力の退避
+    # --- Step 1: 初期設定とファイルパスの準備 ---
+    print_time()
+    print(f"[*] Starting regulation process: {regulation['path']}")
+
+    # regulation_nameを生成（pathから拡張子なしのファイル名を取得）
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    regulation_name = os.path.splitext(os.path.basename(regulation["path"]))[0] + "_" + timestamp
+    folder_name = osp.join(base_dir, regulation_name)
+
+    # フォルダ作成とファイルパス設定
+    os.makedirs(folder_name, exist_ok=True)
+    revision_file = osp.join(folder_name, "revision.json")
+    review_file = osp.join(folder_name, "review.json")
+
+    # --- Step 2: ログファイルの設定 ---
+    print_time()
+    print("[*] Setting up logging...")
+
     if log_file:
         original_stdout = sys.stdout
         original_stderr = sys.stderr
@@ -136,18 +155,9 @@ def do_regulation(
         sys.stderr = log
 
     try:
-        # regulation_nameを生成（pathから拡張子なしのファイル名を取得）
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        regulation_name = os.path.splitext(os.path.basename(regulation["path"]))[0] + "_" + timestamp
-        folder_name = osp.join(base_dir, regulation_name)
-        
-        # フォルダ作成とファイルパス設定
-        os.makedirs(folder_name, exist_ok=True)
-        revision_file = osp.join(folder_name, "revision.json")
-        review_file = osp.join(folder_name, "review.json")
-
+        # --- Step 3: Coderの初期化 ---
         print_time()
-        print(f"[*] Start revising: {regulation['path']}")
+        print("[*] Initializing Coder...")
 
         # Coderの初期化
         io = InputOutput(yes=True, chat_history_file=f"{folder_name}/revision_history.txt")
@@ -169,8 +179,11 @@ def do_regulation(
         draft_res = None
         review_res = None
 
-        # 改定案の作成
+        # --- Step 4: 改定案の作成 ---
         if draft:
+            print_time()
+            print("[*] Starting draft revision...")
+            
             draft_res = draft_revision(
                 regulation=regulation,
                 regulations_dir=regulations_dir,
@@ -182,17 +195,20 @@ def do_regulation(
             if not draft_res:
                 print(f"[draft_revision] 規定 {regulation['path']} の改定案生成に失敗しました。")
                 return False
-            
-            # draft_revision の結果(バージョン1)を revision.json に保存
-            _append_revision(revision_file, draft_res)
         elif osp.exists(revision_file):
+            print_time()
+            print("[*] Loading existing draft revision...")
+            
             # 既存の改定案を読み込む
             with open(revision_file, "r", encoding="utf-8") as f:
                 revisions = json.load(f)
                 draft_res = revisions[-1] if isinstance(revisions, list) else revisions
 
-        # レビュー
+        # --- Step 5: レビューの実施 ---
         if review and draft_res:
+            print_time()
+            print("[*] Starting review process...")
+            
             review_res = review_revision(
                 regulation=regulation,
                 draft_revision=draft_res,
@@ -208,30 +224,59 @@ def do_regulation(
                 print(f"[review_revision] 規定 {regulation['path']} のレビューに失敗しました。")
                 return False
             
-            _append_review(review_file, review_res)
+            # レビュー結果をJSONファイルに保存
+            with open(review_file, "w", encoding="utf-8") as f:
+                json.dump(review_res, f, ensure_ascii=False, indent=4)
         elif osp.exists(review_file):
+            print_time()
+            print("[*] Loading existing review...")
+
             # 既存のレビューを読み込む
             with open(review_file, "r", encoding="utf-8") as f:
                 reviews = json.load(f)
                 review_res = reviews[-1] if isinstance(reviews, list) else reviews
 
-        # 改善
+        # --- Step 6: 改善の実施と再レビュー ---
         if improvement and draft_res and review_res:
+            print_time()
+            print("[*] Starting improvement process...")
+            
             improved_res = improve_revision(
                 current_draft=draft_res,
                 review_data=review_res,
                 coder=coder,
                 num_reflections=num_reflections,
+                revision_file=revision_file,
             )
             if not improved_res:
                 print(f"[improve_revision] 規定 {regulation['path']} の改善に失敗しました。")
                 return False
 
-            # improve_revision の結果(バージョン2)を revision.json に再度上書き追記
-            _append_revision(revision_file, improved_res)
+            # 改善後の再レビュー実施
+            print_time()
+            print("[*] Starting re-review after improvement...")
+            
+            improved_review_res = review_revision(
+                regulation=regulation,
+                draft_revision=improved_res,
+                regulations_dir=regulations_dir,
+                base_dir=folder_name,
+                model=client_model,
+                client=client,
+                num_reflections=num_reflections,
+                num_reviews_ensemble=5,
+                temperature=0.1,
+            )
+            if not improved_review_res:
+                print(f"[review_revision] 改善後の規定 {regulation['path']} の再レビューに失敗しました。")
+                return False
+            
+            # 改善後のレビュー結果を保存
+            with open(osp.join(folder_name, "review_improved.json"), "w", encoding="utf-8") as f:
+                json.dump(improved_review_res, f, ensure_ascii=False, indent=4)
 
         print_time()
-        print(f"[+] Finished revising: {regulation['path']}")
+        print(f"[+] Successfully completed regulation process: {regulation['path']}")
         return True
 
     except Exception as e:
@@ -244,40 +289,6 @@ def do_regulation(
             sys.stderr = original_stderr
             log.close()
 
-
-def _append_revision(revision_file, revision_data):
-    """
-    revision.json に複数バージョンの改定内容を上書き追加するためのヘルパー関数。
-    """
-    if not osp.exists(revision_file):
-        with open(revision_file, "w", encoding="utf-8") as f:
-            json.dump([revision_data], f, ensure_ascii=False, indent=2)
-    else:
-        with open(revision_file, "r", encoding="utf-8") as f:
-            existing_data = json.load(f)
-            if not isinstance(existing_data, list):
-                existing_data = [existing_data]
-
-        existing_data.append(revision_data)
-        with open(revision_file, "w", encoding="utf-8") as f:
-            json.dump(existing_data, f, ensure_ascii=False, indent=2)
-
-def _append_review(review_file, review_data):
-    """
-    review.json にレビュー結果を上書き追加するためのヘルパー関数。
-    """
-    if not osp.exists(review_file):
-        with open(review_file, "w", encoding="utf-8") as f:
-            json.dump([review_data], f, ensure_ascii=False, indent=2)
-    else:
-        with open(review_file, "r", encoding="utf-8") as f:
-            existing_data = json.load(f)
-            if not isinstance(existing_data, list):
-                existing_data = [existing_data]
-
-        existing_data.append(review_data)
-        with open(review_file, "w", encoding="utf-8") as f:
-            json.dump(existing_data, f, ensure_ascii=False, indent=2)
 
 def worker(
         queue,

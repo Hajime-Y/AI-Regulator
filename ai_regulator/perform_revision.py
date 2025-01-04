@@ -104,6 +104,28 @@ JSON_FORMAT_FIX_PROMPT = """{error_text}
 ```
 """
 
+# ==============================
+# 本来はoriginal_textが元の文面と正しかったかをチェックしたかった。
+# pypdfでPDFから文章を取得した場合誤字が発生し、それをLLMが勝手に修正してoriginal_textとしてします。
+# これによって処理が失敗となってしまうため、現状不使用とする。
+# ==============================
+# def _check_revision(
+#         draft: List[Dict[str, str]], 
+#         regulation_content: str
+# ) -> List[str]:
+#     """
+#     機械的に検証する関数。
+#     draft に含まれる "original_text" が必ず regulation_content に そのまま（完全一致で）含まれているかをチェックする。
+#     完全一致とならなかった original_text のリストを返す。
+#     すべて含まれていれば空のリストを返す。
+#     """
+#     not_found = []
+#     for item in draft:
+#         original_text = item.get("original_text", "")
+#         if original_text not in regulation_content.replace("\n", ""):
+#             not_found.append(original_text)
+#     return not_found
+
 
 def draft_revision(
         regulation: Dict[str, Any],

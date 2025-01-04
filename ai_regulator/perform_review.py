@@ -1,5 +1,6 @@
 import os
 import os.path as osp
+import numpy as np
 import json
 import time
 from typing import Dict, Any, List, Optional
@@ -21,19 +22,7 @@ REVIEW_REVISION_SYSTEM_PROMPT = """あなたは銀行規定の改定案をレビ
 それを踏まえて改定案のレビューを行います。
 """
 
-REVIEW_REVISION_USER_PROMPT = """以下の情報を参照し、改定案に対するレビューを行ってください。
-
-<regulation_content>
-{regulation_content}
-</regulation_content>
-
-<update_info>
-{update_info}
-</update_info>
-
-<draft_revision>
-{draft_revision}
-</draft_revision>
+REVIEW_FORM = """
 
 ## レビューフォーム
 規定改定案に対するレビュー時に考慮すべき指針を以下に示します。
@@ -70,6 +59,21 @@ REVIEW_REVISION_USER_PROMPT = """以下の情報を参照し、改定案に対�
    3: 評価について確信がある。ただし、規定内容や改定に関わる変更情報の一部を理解していない可能性がある。
    2: 評価を擁護する意思はあるが、規定内容や改定に関わる変更情報の中心的な部分を理解していない。
    1: 評価は推測を含むものである。規定内容や改定に関わる変更情報が専門分野外であり、ほとんど理解できていない。
+"""
+
+REVIEW_REVISION_USER_PROMPT = REVIEW_FORM + """以下の情報を参照し、改定案に対するレビューを行ってください。
+
+<regulation_content>
+{regulation_content}
+</regulation_content>
+
+<update_info>
+{update_info}
+</update_info>
+
+<draft_revision>
+{draft_revision}
+</draft_revision>
 
 出力は以下の形式で必ず行ってください:
 
@@ -116,34 +120,67 @@ REVIEW JSON:
 "I am done" は変更を加えない場合のみ含めてください。
 """
 
-IMPROVE_REVISION_SYSTEM_PROMPT = """あなたは銀行規定の改定を行うAIアシスタントです。
-以下に示す「改定案（original_text → revised_text の複数ペア）」と「レビュー内容」を踏まえて、改定案を再編集してください。
-特にレビューで指摘された問題点を改善し、より優れた改定案にしてください。なお、
-(1)改定前文面(original_text) は必ず規定ファイルそのままを保持
-(2)改定後文面(revised_text) はレビューコメントの内容を適切に取り入れて修正
-としてください。
-"""
+IMPROVE_REVISION_USER_PROMPT = """プロジェクトに `revision.json` ファイルを用意しました。
 
-IMPROVE_REVISION_USER_PROMPT = """以下の情報を基に、改定案の改善を行ってください。
-
-<current_draft_revision>
-{current_draft_revision}
-</current_draft_revision>
+以下のレビュー結果をもとに、セクション名、改定前の文面、改定後の文面 をjsonのリスト形式で構成された改定案を改善してください。
+なお、文面は省略や「...」などを使わずに全文を記載してください。
 
 <review_result>
 {review_result}
 </review_result>
 
-改定案(1)original_textは規定ファイルの内容をそのまま、 (2)revised_textはレビュー指摘を反映した修正案を提示してください。
-出力形式は以下のとおりにしてください:
-
-THOUGHT:
-<THOUGHT>
-
-IMPROVED REVISION JSON:
+ファイルは必ず以下のようなjson形式である必要があります。
 ```json
 [
   {{
+    "section_name": "...",
+    "original_text": "...",
+    "revised_text": "..."
+  }},
+  ...
+]
+```
+
+ファイルは、以下のフィールドを含むJSONフォーマットで確認の必要性を提供してください：
+ - section_name: セクション名は元の改定案のセクション名をそのまま引用してください（改変しない）。
+ - original_text: 改定前の文面は元の改定案のoriginal_textをそのまま引用してください（改変しない）。
+ - revised_text: 改定後の文面は省略せず、レビュー結果を反映した改定案を正確に書いてください。
+
+改定箇所は可能な限り必要最低限とし、レビュー結果に関連のない箇所に不必要に情報を追加しようとはしないでください。
+
+このJSONは自動的に解析されるため、フォーマットは正確である必要があります。
+
+必ずファイル名を最初に指定し、これらの編集を行うために *SEARCH/REPLACE* ブロックを使用してください。
+"""
+
+IMPROVE_REVISION_REFLECTION_PROMPT = """Round {current_round}/{num_reflections}.
+先ほど生成した改定案(複数のペア)をreview_resultで指摘された内容で再度精査し、必要であれば改善してください。
+
+もし修正が必要であれば、ファイルは再度同じjson形式としてください：
+```json
+<JSON>
+```
+
+original_textは、改定前の文面であり、元の改定案のoriginal_textを必ずそのまま引用してください（改変しない）。
+改定箇所は可能な限り必要最低限とし、レビュー結果に関連のない箇所に不必要に情報を追加しようとはしないでください。
+
+もし修正が不要なら、以下のような変更なしの *SEARCH/REPLACE* ブロックを返します。
+revision.json
+```python
+<<<<<<< SEARCH
+=======
+>>>>>>> REPLACE
+```
+
+必ずファイル名を最初に指定し、これらの編集を行うために *SEARCH/REPLACE* ブロックを使用してください。
+"""
+
+JSON_FORMAT_FIX_PROMPT = """{error_text}
+ファイルは必ず以下のようなjson形式である必要があります。。
+```json
+[
+  {{
+    "section_name": "...",
     "original_text": "...",
     "revised_text": "..."
   }},
@@ -152,22 +189,86 @@ IMPROVED REVISION JSON:
 ```
 """
 
-IMPROVE_REVISION_REFLECTION_PROMPT = """Round {current_round}/{num_reflections}.
-先ほど生成した改定案（修正後）を再度検討し、必要があれば修正してください。
+META_REVIEWER_SYSTEM_PROMPT = """あなたは銀行規定の改定案をレビューする上級AIレビュアーです。
+{reviewer_count}人のレビュアーからのフィードバックを分析し、より包括的で客観的なメタレビューを作成することが役割です。
+あなたの仕事は、複数のレビューを同じフォーマットで1つのメタレビューにまとめることです。
+判断は批判的かつ慎重であり、全レビュアーの意見を尊重しながらそれらを統合した最終的な評価を提供してください。
+"""
 
-修正が必要なら、以下の形式で出力してください:
+META_REVIEWER_USER_PROMPT = REVIEW_FORM + """
+出力は以下の形式で必ず行ってください:
+
 THOUGHT:
 <THOUGHT>
 
-IMPROVED REVISION JSON:
+REVIEW JSON:
 ```json
 <JSON>
 ```
 
-もし修正が不要なら、THOUGHTの末尾に "I am done" と書き、そのあとに前回と全く同じJSONをそのまま出力してください。
-"I am done" は変更を加えない場合のみ含めてください。
+<THOUGHT>では、まず評価に対するあなたの直感的な考えと推論について簡潔に説明してください。
+レビューの高レベルな論点、必要な判断、望ましい結果について詳しく述べてください。
+ここでは一般的なコメントは避け、現在の規定改定案に特化した具体的な内容を書いてください。
+
+<JSON>では、以下のフィールドを含むJSONフォーマットでレビューを提供してください：
+ - "format_check": 規定集の形式を適切に維持しているか
+ - "removal_check": 不要な削除がないか
+ - "consistency_check": 規定集の役割・目的との整合性
+ - "completeness_check": 変更情報の内容を漏れなく改定に反映しているか
+ - "overall": 1から5の評価（低い、中程度、高い、非常に高い、絶対的）
+ - "confidence": 1から5の評価（低い、中程度、高い、非常に高い、絶対的）
+ - "comment": 改定案に対するコメントや建設的なフィードバック
+
+このJSONは自動的に解析されるため、フォーマットは正確である必要があります。
 """
 
+def get_meta_review(
+    model: str,
+    client: Any,
+    temperature: float,
+    reviews: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """
+    複数のレビューを分析し、統合されたメタレビューを生成する
+
+    Args:
+        model: 使用するLLMモデル
+        client: LLMクライアント
+        temperature: 生成時の温度パラメータ
+        reviews: レビューのリスト
+
+    Returns:
+        統合されたメタレビュー
+    """
+    # レビューをテキスト形式に変換
+    review_text = ""
+    for i, r in enumerate(reviews):
+        review_text += f"""
+レビュー {i + 1}/{len(reviews)}:
+```json
+{json.dumps(r, ensure_ascii=False, indent=2)}
+```
+"""
+
+    # プロンプトの構築
+    system_prompt = META_REVIEWER_SYSTEM_PROMPT.format(reviewer_count=len(reviews))
+    base_prompt = META_REVIEWER_USER_PROMPT + review_text
+
+    # メタレビューの生成
+    llm_review, msg_history = get_response_from_llm(
+        base_prompt,
+        model=model,
+        client=client,
+        system_message=META_REVIEWER_SYSTEM_PROMPT.format(reviewer_count=len(reviews)),
+        print_debug=False,
+        msg_history=None,
+        temperature=temperature,
+    )
+
+    # JSONの抽出
+    meta_review = extract_json_between_markers(llm_review)
+
+    return meta_review
 
 def review_revision(
         regulation: Dict[str, Any],
@@ -178,21 +279,22 @@ def review_revision(
         client: Any,
         num_reflections: int = 1,
         num_reviews_ensemble: int = 1,
-        temperature: float = 0.7,
+        temperature: float = 0.75,
         msg_history: Optional[List[Dict[str, str]]] = None,
+        return_msg_history=False,
 ) -> Dict[str, Any]:
     """
-    改定案のレビューを行う。
-     - regulation(dict): target_regulations.json のエントリ
-     - draft_revision: draft_revision() で生成された改定案のリスト
-        [ { "original_text": "...", "revised_text": "..." }, ... ]
-    
+    銀行規定の改定案に対してAIレビューを実施する
+
     手順:
-        1. 規定ファイルを読み込み、reason/comment などをまとめる
-        2. LLMにレビューさせる(Reflectionあり)
-        3. 最終的なレビューJSONを返す
+    1. 規定ファイルと更新情報を読み込み、レビュー用の情報を準備
+    2. LLMを用いて初回レビューを生成
+        - 単一レビュー: 1回のレビュー生成
+        - アンサンブル: 複数のレビューを生成し、メタレビューで統合
+    3. レビュー結果に対して指定回数のリフレクション（再検討）を実施
+    4. 最終的なレビュー結果を返す
     """
-    # 規定ファイルの読み込み
+    # --- Step 1: 規定ファイルと更新情報の読み込み ---
     rel_path = regulation.get("path")
     if not rel_path:
         print("[review_revision] No path found in regulation.")
@@ -226,9 +328,9 @@ def review_revision(
 
     print("[review_revision] Generating initial review...")
 
-    # --- Step 1: 初回呼び出し ---
+    # --- Step 2: 初回レビューの生成 ---
     if num_reviews_ensemble > 1:
-        # 複数のレビューを生成
+        # 複数のレビューを生成してメタレビューに統合
         llm_reviews, msg_histories = get_batch_responses_from_llm(
             base_prompt,
             model=model,
@@ -236,7 +338,8 @@ def review_revision(
             system_message=REVIEW_REVISION_SYSTEM_PROMPT,
             print_debug=False,
             msg_history=msg_history,
-            temperature=temperature,
+            # Higher temperature to encourage diversity.
+            temperature=0.75,
             n_responses=num_reviews_ensemble,
         )
         
@@ -250,23 +353,40 @@ def review_revision(
             except Exception as e:
                 print(f"[review_revision] Ensemble review {idx} failed: {e}")
         
-        # レビューの集約
-        final_review = aggregate_reviews(parsed_reviews)
+        # メタレビューの生成
+        review = get_meta_review(model, client, temperature, parsed_reviews)
+
+        # take first valid in case meta-reviewer fails
+        if review is None:
+            review = parsed_reviews[0]
+
+        # スコアの制限と平均値の計算
+        for score, limits in [
+            ("overall", (1, 5)),
+            ("confidence", (1, 5)),
+        ]:
+            scores = []
+            for r in parsed_reviews:
+                if score in r and limits[1] >= r[score] >= limits[0]:
+                    scores.append(r[score])
+            review[score] = int(round(np.mean(scores)))
         
         # メッセージ履歴の更新
         msg_history = msg_histories[0][:-1]
-        msg_history += [{
-            "role": "assistant",
-            "content": f"""
+        msg_history += [
+            {
+                "role": "assistant",
+                "content": f"""
 THOUGHT:
-{num_reviews_ensemble}人のレビュアーの意見を集約しました。
+以前に取得した{num_reviews_ensemble}人のレビュアーの意見を集約していきます。
 
 REVIEW JSON:
 ```json
-{json.dumps(final_review, ensure_ascii=False, indent=2)}
+{json.dumps(review, ensure_ascii=False, indent=2)}
 ```
-"""
-        }]
+""",
+            }
+        ]
     else:
         # 単一レビューの生成
         response_text, msg_history = get_response_from_llm(
@@ -278,119 +398,131 @@ REVIEW JSON:
             msg_history=msg_history,
             temperature=temperature,
         )
-        final_review = extract_json_between_markers(response_text)
-        if not final_review:
-            print("[review_revision] Failed to extract JSON on initial review.")
-            return {}
+        review = extract_json_between_markers(response_text)
 
-    # --- Step 2: Reflection ---
+    # --- Step 3: Reflectionの実施 ---
     for r in range(num_reflections - 1):
-        if "I am done" in response_text:
-            break
-
         reflection_prompt = REVIEW_REVISION_REFLECTION_PROMPT.format(
             current_round=r+2,
             num_reflections=num_reflections,
         )
         reflection_output, msg_history = get_response_from_llm(
             reflection_prompt,
-            model=model,
             client=client,
+            model=model,
             system_message=REVIEW_REVISION_SYSTEM_PROMPT,
-            print_debug=False,
             msg_history=msg_history,
             temperature=temperature,
         )
-        reflection_json = extract_json_between_markers(reflection_output)
-        if reflection_json:
-            final_review = reflection_json
-            response_text = reflection_output
+        review = extract_json_between_markers(reflection_output)
 
         if "I am done" in reflection_output:
             break
 
-    return final_review
-
-def aggregate_reviews(reviews: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """複数のレビューを1つに集約する"""
-    if not reviews:
+    # --- Step 4: 最終結果の返却 ---
+    if not review:
+        print("[review_revision] Failed to extract JSON on initial review.")
         return {}
-    
-    # 最初のレビューをベースとして使用
-    aggregated = reviews[0].copy()
-    
-    # 数値フィールドの平均を計算
-    numeric_fields = ["overall", "confidence"]
-    for field in numeric_fields:
-        values = [r[field] for r in reviews if field in r]
-        if values:
-            aggregated[field] = round(sum(values) / len(values))
-    
-    # テキストフィールドの結合
-    text_fields = ["format_check", "removal_check", "consistency_check", "completeness_check", "comment"]
-    for field in text_fields:
-        if field in aggregated:
-            values = [r[field] for r in reviews if field in r]
-            aggregated[field] = "\n".join(f"レビュアー{i+1}: {v}" for i, v in enumerate(values))
-    
-    return aggregated
 
+    if return_msg_history:
+        return review, msg_history
+    else:
+        return review
+
+
+def format_review_result(review_data: Dict[str, Any]) -> str:
+    """レビュー結果をテキスト形式にフォーマットする"""
+    result = []
+    result.append("## レビュー結果")
+    
+    # 各チェック項目
+    checks = {
+        "フォーマットチェック": "format_check",
+        "削除チェック": "removal_check",
+        "一貫性チェック": "consistency_check",
+        "完全性チェック": "completeness_check"
+    }
+    
+    for title, key in checks.items():
+        if key in review_data:
+            result.append(f"\n### {title}")
+            result.append(review_data[key])
+    
+    # 評価とコメント
+    result.append("\n### 総合評価")
+    result.append(f"評価: {review_data.get('overall', '不明')}/5")
+    result.append(f"信頼度: {review_data.get('confidence', '不明')}/5")
+    
+    if "comment" in review_data:
+        result.append("\n### コメント")
+        result.append(review_data["comment"])
+    
+    return "\n".join(result)
 
 def improve_revision(
         current_draft: List[Dict[str, str]], 
         review_data: Dict[str, Any], 
-        coder: Coder, 
-        num_reflections: int = 1,
+        coder: Coder,
+        revision_file: str,
 ) -> List[Dict[str, str]]:
     """
     review_revision の結果 (review_data) を踏まえて改定案を再編集する。
     
     手順:
-    1. LLM に「current_draft_revision」(オリジナルの改定案) と「review_result」(上記レビューJSON) を渡して
-        改定案を修正させる(Reflectionあり)
-    2. 最終的な改定案のリストを返す
-
-    戻り値:
-    [
-        { "original_text": "...", "revised_text": "..." },
-        ...
-    ]
+    1. LLMに改定案の修正を指示
+    2. 最終的な生成結果に対してファイルがjson形式となっているか確認
+    3. JSON形式エラーの場合は修正を試行（最大3回）
+    4. 成功したら最終リストを返す(失敗したらcurrent_draftを返す)
     """
-    current_draft_str = json.dumps(current_draft, ensure_ascii=False, indent=2)
-    review_str = json.dumps(review_data, ensure_ascii=False, indent=2)
-
-    system_msg = IMPROVE_REVISION_SYSTEM_PROMPT
-    user_msg = IMPROVE_REVISION_USER_PROMPT.format(
-        current_draft_revision=current_draft_str,
-        review_result=review_str,
+    # --- Step 1: 初回生成 ---
+    # レビュー結果をテキスト形式に変換
+    review_result_text = format_review_result(review_data)
+    
+    improve_prompt = IMPROVE_REVISION_USER_PROMPT.format(
+        review_result=review_result_text,
     ).replace(r"{{", "{").replace(r"}}", "}")
 
+    # Coderを用いてプロンプトを実行
     print("[improve_revision] Generating improved revision...")
+    coder_out = coder.run(improve_prompt)
 
-    # --- Step 1: 初回呼び出し ---
-    response_text = coder.run(f"{system_msg}\n\n{user_msg}")
-    improved_json = extract_json_between_markers(response_text)
-    if not improved_json:
-        print("[improve_revision] Failed to extract JSON on initial improvement call.")
+    # --- Step 2: 最終チェック ---
+    max_tries = 3
+    json_check_success = False
+    final_checked_data = None
+
+    # JSON形式のチェック
+    for attempt in range(max_tries):
+        fix_prompt = ""
+        try:
+            with open(revision_file, "r", encoding="utf-8") as f:
+                final_checked_data = json.load(f)
+            json_check_success = True
+            break
+        except FileNotFoundError:
+            print(f"[improve_revision] Revision file not found on attempt {attempt+1}")
+            break
+        except json.JSONDecodeError as e:
+            print(f"[improve_revision] JSON parse error on attempt {attempt+1}: {e}")
+            error_text = f"JSONパースエラーが発生しました。修正してください。\n{e}\n"
+            fix_prompt += JSON_FORMAT_FIX_PROMPT.format(
+                error_text=error_text
+            ).replace(r"{{", "{").replace(r"}}", "}")
+        except Exception as e:
+            print(f"[improve_revision] Unexpected error on attempt {attempt+1}: {e}")
+            error_text = f"予期せぬエラーが発生しました。修正してください。\n{e}\n"
+            fix_prompt += JSON_FORMAT_FIX_PROMPT.format(
+                error_text=error_text
+            ).replace(r"{{", "{").replace(r"}}", "}")
+
+        if fix_prompt:
+            # 修正を行う
+            coder_out = coder.run(fix_prompt)
+
+    if not json_check_success:
+        print("[improve_revision] Final json format check failed after 3 attempts.")
         return current_draft  # fallback
 
-    # --- Step 2: Reflection ---
-    final_improved = improved_json
-    for r in range(num_reflections - 1):
-        if "I am done" in response_text:
-            break
+    print(f"[improve_revision] Successfully wrote improved revision to {revision_file}")
 
-        reflection_prompt = IMPROVE_REVISION_REFLECTION_PROMPT.format(
-            current_round=r+2,
-            num_reflections=num_reflections,
-        )
-        reflection_text = coder.run(f"{system_msg}\n\n{reflection_prompt}")
-        new_json = extract_json_between_markers(reflection_text)
-        if new_json:
-            final_improved = new_json
-            response_text = reflection_text
-
-        if "I am done" in reflection_text:
-            break
-
-    return final_improved
+    return final_checked_data
