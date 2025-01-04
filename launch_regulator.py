@@ -133,8 +133,7 @@ def do_regulation(
     print(f"[*] Starting regulation process: {regulation['path']}")
 
     # regulation_nameを生成（pathから拡張子なしのファイル名を取得）
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    regulation_name = os.path.splitext(os.path.basename(regulation["path"]))[0] + "_" + timestamp
+    regulation_name = os.path.splitext(os.path.basename(regulation["path"]))[0]
     folder_name = osp.join(base_dir, regulation_name)
 
     # フォルダ作成とファイルパス設定
