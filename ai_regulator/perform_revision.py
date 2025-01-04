@@ -162,7 +162,7 @@ def draft_revision(
     # update_info.txtの読み込み
     update_info_path = osp.join(base_dir, "update_info.txt")
     if not osp.exists(update_info_path):
-        print("[review_revisions] update_info.txt not found.")
+        print("[draft_revision] update_info.txt not found.")
         return []
     
     with open(update_info_path, "r", encoding="utf-8") as f:

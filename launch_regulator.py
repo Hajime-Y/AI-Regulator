@@ -187,7 +187,7 @@ def do_regulation(
             draft_res = draft_revision(
                 regulation=regulation,
                 regulations_dir=regulations_dir,
-                base_dir=folder_name,
+                base_dir=base_dir,
                 coder=coder,
                 revision_file=revision_file,
                 num_reflections=num_reflections,
@@ -213,7 +213,7 @@ def do_regulation(
                 regulation=regulation,
                 draft_revision=draft_res,
                 regulations_dir=regulations_dir,
-                base_dir=folder_name,
+                base_dir=base_dir,
                 model=client_model,
                 client=client,
                 num_reflections=num_reflections,

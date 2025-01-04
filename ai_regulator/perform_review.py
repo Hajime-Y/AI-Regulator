@@ -4,6 +4,7 @@ import numpy as np
 import json
 import time
 from typing import Dict, Any, List, Optional
+from pypdf import PdfReader
 
 from aider.coders import Coder
 from ai_regulator.llm import (
@@ -305,8 +306,20 @@ def review_revision(
         print(f"[review_revision] Regulation file not found: {full_path}")
         return {}
 
-    with open(full_path, "r", encoding="utf-8") as f:
-        regulation_content = f.read()
+    try:
+        if rel_path.lower().endswith('.pdf'):
+            # PDFファイルの場合
+            reader = PdfReader(full_path)
+            regulation_content = ''
+            for page in reader.pages:
+                regulation_content += page.extract_text() + '\n'
+        else:
+            # 通常のテキストファイルの場合
+            with open(full_path, "r", encoding="utf-8") as f:
+                regulation_content = f.read()
+    except Exception as e:
+        print(f"[review_revision] Error reading file {rel_path}: {str(e)}")
+        return {}
 
     # update_info.txtの読み込み
     update_info_path = osp.join(base_dir, "update_info.txt")
