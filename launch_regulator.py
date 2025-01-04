@@ -362,19 +362,21 @@ def main():
         num_reflections=args.num_reflections,
         skip_list_regulations=args.skip_list_regulations,
     )
-    # 規定ファイルを保存（ターゲットとなる規定の一覧）
-    with open(os.path.join(base_dir, "target_regulations.json"), "w", encoding="utf-8") as f:
-        json.dump(regulations, f, ensure_ascii=False, indent=4)
 
     # 改定要否の確認（改定が必要なものをフィルタリングするなど）
-    regs_to_revise = check_revisions(
-        target_regulations=regulations,
-        regulations_dir=regulations_dir,
-        base_dir=base_dir,
-        client=client,
-        model=client_model,
-        num_reflections=args.num_reflections,
-    )
+    # skip_list_regulationsがFalseの場合（つまり、list_regulationsが実行された場合）のみ
+    # かつ skip_checkがFalseの場合にcheck_revisionsを実行
+    if not args.skip_list_regulations and not args.skip_check:
+        regs_to_revise = check_revisions(
+            target_regulations=regulations,
+            regulations_dir=regulations_dir,
+            base_dir=base_dir,
+            client=client,
+            model=client_model,
+            num_reflections=args.num_reflections,
+        )
+    else:
+        regs_to_revise = regulations
 
     # 並列実行モードとシーケンシャルモードの分岐
     if args.parallel > 0:
