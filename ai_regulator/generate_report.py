@@ -36,8 +36,8 @@ def create_regulation_summary(regulations):
     return summary
 
 def create_revision_details(base_dir):
-    """改定内容の詳細を作成"""
-    details = "## 3. 改定内容の詳細\n\n"
+    """改定案の詳細を作成"""
+    details = "## 3. 改定案の詳細\n\n"
     
     # base_dir内の各改定フォルダを処理
     for folder in sorted(os.listdir(base_dir)):
