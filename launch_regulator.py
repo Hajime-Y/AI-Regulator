@@ -107,7 +107,7 @@ def get_available_gpus(gpu_ids=None):
     return list(range(torch.cuda.device_count()))
 
 
-def do_regulation(
+def revise_regulation(
     regulation: Dict[str, Any],
     regulations_dir: str,
     base_dir: str,
@@ -277,7 +277,7 @@ def do_regulation(
         return True
 
     except Exception as e:
-        print(f"[!] Error in do_regulation for {regulation.get('path', 'Unknown')}: {str(e)}")
+        print(f"[!] Error in revise_regulation for {regulation.get('path', 'Unknown')}: {str(e)}")
         return False
 
     finally:
@@ -313,7 +313,7 @@ def worker(
         if regulation is None:
             break
 
-        success = do_regulation(
+        success = revise_regulation(
             regulation=regulation,
             regulations_dir=regulations_dir,
             base_dir=base_dir,
@@ -423,7 +423,7 @@ def main():
     else:
         # シーケンシャル実行
         for reg in regs_to_revise:
-            success = do_regulation(
+            success = revise_regulation(
                 regulation=reg,
                 regulations_dir=regulations_dir,
                 base_dir=base_dir,
