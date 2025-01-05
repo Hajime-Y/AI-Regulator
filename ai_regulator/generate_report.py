@@ -132,6 +132,10 @@ def highlight_differences(old_text, new_text):
     """
     old_text と new_text の差分を比較し、差分があった箇所を <u> タグで強調して返す
     """
+    # 改定後テキストが"-"の場合は、改定前テキストはそのまま返す
+    if new_text == '-':
+        return old_text, "（改定作業においてやはり改定は不要だと判断しました。）"
+
     # SequenceMatcher で差分を解析
     d = difflib.SequenceMatcher(None, old_text, new_text)
     result_old = ""
