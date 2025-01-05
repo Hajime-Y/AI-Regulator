@@ -14,6 +14,7 @@ AVAILABLE_LLMS = [
     "gpt-4o-mini-2024-07-18",
     "gpt-4o-2024-05-13",
     "gpt-4o-2024-08-06",
+    "gpt-4o-2024-11-20",
     "o1-preview-2024-09-12",
     "o1-mini-2024-09-12",
     "deepseek-coder-v2-0724",
@@ -52,6 +53,7 @@ def get_batch_responses_from_llm(
         "gpt-4o-2024-05-13",
         "gpt-4o-mini-2024-07-18",
         "gpt-4o-2024-08-06",
+        "gpt-4o-2024-11-20",
     ]:
         new_msg_history = msg_history + [{"role": "user", "content": msg}]
         response = client.chat.completions.create(
@@ -180,6 +182,7 @@ def get_response_from_llm(
         "gpt-4o-2024-05-13",
         "gpt-4o-mini-2024-07-18",
         "gpt-4o-2024-08-06",
+        "gpt-4o-2024-11-20",
     ]:
         new_msg_history = msg_history + [{"role": "user", "content": msg}]
         response = client.chat.completions.create(
