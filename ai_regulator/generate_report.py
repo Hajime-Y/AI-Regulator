@@ -69,6 +69,8 @@ def create_revision_details(base_dir):
                 'removal_check': '削除チェック',
                 'consistency_check': '一貫性評価',
                 'completeness_check': '完全性評価',
+                'documentation_check': '記載原則評価',
+                'necessity_check': '改定必要性評価',
                 'overall': '総合評価',
                 'confidence': '信頼度',
                 'comment': 'コメント'
