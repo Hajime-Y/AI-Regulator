@@ -4,7 +4,7 @@ import os.path as osp
 from datetime import datetime
 import markdown
 import pdfkit
-from pypdf import PdfReader
+import difflib
 
 def load_json_file(file_path):
     """JSONファイルを読み込む"""
@@ -89,25 +89,77 @@ def create_revision_details(base_dir):
         if isinstance(revision_data, list):
             for item in revision_data:
                 section = item.get('section_name', '')
-                # 改行を<br>タグに置換
-                original = f"{section}<br><br>{item.get('original_text', '-')}" if section else item.get('original_text', '-')
-                revised = f"{section}<br><br>{item.get('revised_text', '-')}" if section else item.get('revised_text', '-')
-                # 文字列内の改行を<br>タグに置換
-                original = original.replace('\n', '<br>')
-                revised = revised.replace('\n', '<br>')
-                details += f"| {original} | {revised} |\n"
+                original_text = item.get('original_text', '-')
+                revised_text = item.get('revised_text', '-')
+
+                # 差分を強調
+                highlighted_old, highlighted_new = highlight_differences(original_text, revised_text)
+
+                # セクション名を上に表示
+                if section:
+                    highlighted_old = f"{section}<br><br>{highlighted_old}"
+                    highlighted_new = f"{section}<br><br>{highlighted_new}"
+                
+                # 改行を <br> タグに置き換える
+                highlighted_old = highlighted_old.replace('\n', '<br>')
+                highlighted_new = highlighted_new.replace('\n', '<br>')
+
+                details += f"| {highlighted_old} | {highlighted_new} |\n"
         else:
             # 単一のrevision_dataの場合の処理
             section = revision_data.get('section_name', '')
-            original = f"{section}<br><br>{revision_data.get('original_text', '-')}" if section else revision_data.get('original_text', '-')
-            revised = f"{section}<br><br>{revision_data.get('revised_text', '-')}" if section else revision_data.get('revised_text', '-')
-            original = original.replace('\n', '<br>')
-            revised = revised.replace('\n', '<br>')
-            details += f"| {original} | {revised} |\n"
+            original_text = revision_data.get('original_text', '-')
+            revised_text = revision_data.get('revised_text', '-')
+
+            # 差分を強調
+            highlighted_old, highlighted_new = highlight_differences(original_text, revised_text)
+
+            if section:
+                highlighted_old = f"{section}<br><br>{highlighted_old}"
+                highlighted_new = f"{section}<br><br>{highlighted_new}"
+
+            # 改行を <br> タグに置き換える
+            highlighted_old = highlighted_old.replace('\n', '<br>')
+            highlighted_new = highlighted_new.replace('\n', '<br>')
+
+            details += f"| {highlighted_old} | {highlighted_new} |\n"
         
         details += "\n"
     
     return details
+
+def highlight_differences(old_text, new_text):
+    """
+    old_text と new_text の差分を比較し、差分があった箇所を <u> タグで強調して返す
+    """
+    # SequenceMatcher で差分を解析
+    d = difflib.SequenceMatcher(None, old_text, new_text)
+    result_old = ""
+    result_new = ""
+
+    # get_opcodes() は差分の種類と、その差分が生じた index 範囲を返す
+    # 例: [('equal', 0, 5, 0, 5), ('replace', 5, 6, 5, 6), ...] のようなイメージ
+    for tag, i1, i2, j1, j2 in d.get_opcodes():
+        old_segment = old_text[i1:i2]
+        new_segment = new_text[j1:j2]
+
+        if tag == 'replace':
+            # old_text と new_text の両方が書き換わった
+            result_old += f'<u>{old_segment}</u>'
+            result_new += f'<u>{new_segment}</u>'
+        elif tag == 'delete':
+            # old_text 側で削除された文字列
+            result_old += f'<u>{old_segment}</u>'
+        elif tag == 'insert':
+            # new_text 側で追加された文字列
+            result_new += f'<u>{new_segment}</u>'
+        elif tag == 'equal':
+            # 変更がない部分はそのまま連結
+            result_old += old_segment
+            result_new += new_segment
+
+    return result_old, result_new
+
 
 def generate_report(base_dir, regulations_file, update_info_file, md_report, pdf_report):
     """改定レポートを生成"""
