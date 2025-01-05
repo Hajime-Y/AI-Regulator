@@ -49,9 +49,9 @@ python launch_regulator.py \
 ## regulations/templateフォルダについて
 
 ### regulations
-- 三菱UFJ銀行の外部向け規定一覧（https://www.bk.mufg.jp/regulation/index.html）をPDF化して保存しています
+- 三菱UFJ銀行の外部向け[規定一覧](https://www.bk.mufg.jp/regulation/index.html)をPDF化して保存しています
 - templateフォルダの改定情報を反映する前の状態の規定が格納されています
 
 ### template
 - 2024年の規定改定情報を含むフォルダです
-- 三菱UFJ銀行のお知らせページ（https://www.bk.mufg.jp/info/sonota.html）から、主要な改定情報をピックアップしています
+- 三菱UFJ銀行の[お知らせ](https://www.bk.mufg.jp/info/sonota.html)から、主要な改定情報をピックアップしています
