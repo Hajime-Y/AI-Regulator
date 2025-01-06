@@ -19,7 +19,7 @@ from ai_regulator.llm import (
 
 REVIEW_REVISION_SYSTEM_PROMPT = """あなたは銀行規定の改定案をレビューするAI銀行員です。
 判断には批判的かつ慎重であるべきです。改定案の質が低いか、信頼度(Confidence)が低い場合は、低い評価点をつけます。
-「規定集の内容(regulation_content)」と「更新情報(update_info)」、「改定案(draft_revision)」が与えられるます。
+「規定集の内容(regulation_content)」と「変更情報(update_info)」、「改定案(draft_revision)」が与えられるます。
 それを踏まえて改定案のレビューを行います。
 """
 
@@ -325,14 +325,14 @@ def review_revision(
     銀行規定の改定案に対してAIレビューを実施する
 
     手順:
-    1. 規定ファイルと更新情報を読み込み、レビュー用の情報を準備
+    1. 規定ファイルと変更情報を読み込み、レビュー用の情報を準備
     2. LLMを用いて初回レビューを生成
         - 単一レビュー: 1回のレビュー生成
         - アンサンブル: 複数のレビューを生成し、メタレビューで統合
     3. レビュー結果に対して指定回数のリフレクション（再検討）を実施
     4. 最終的なレビュー結果を返す
     """
-    # --- Step 1: 規定ファイルと更新情報の読み込み ---
+    # --- Step 1: 規定ファイルと変更情報の読み込み ---
     rel_path = regulation.get("path")
     if not rel_path:
         print("[review_revision] No path found in regulation.")

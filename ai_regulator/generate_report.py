@@ -180,7 +180,7 @@ def generate_report(base_dir, regulations_file, update_info_file, md_report, pdf
 
             update_info = f"## 1. 変更内容\n\n{update_info_formatted}\n\n"
     except Exception as e:
-        update_info = "## 1. 変更内容\n\n*更新情報なし*\n\n"
+        update_info = "## 1. 変更内容\n\n*変更情報なし*\n\n"
     
     # 2. 規定集リストの要約
     regulations = load_json_file(regulations_file) or []

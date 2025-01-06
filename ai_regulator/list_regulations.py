@@ -12,7 +12,7 @@ from ai_regulator.llm import get_response_from_llm, extract_json_between_markers
 
 # 規定リストアップ時のシステムプロンプト
 LIST_REGULATIONS_SYSTEM_PROMPT = """あなたは銀行規定の改定を行うAIアシスタントです。
-以下の目次（XML形式）と更新情報に基づき、改定が必要になりそうな規定を検討し、そのファイルパスと理由を出力してください。
+以下の目次（XML形式）と変更情報に基づき、改定が必要になりそうな規定を検討し、そのファイルパスと理由を出力してください。
 ファイルパスは必ず toc.xml に記載された内容を参照し、相対パスで出力してください。
 また、必ず実在するファイルのみを出力してください（この後、ファイル存在チェックを行います）。
 出力はJSON形式で行い、必ず正しい形式にしてください。
@@ -22,7 +22,7 @@ LIST_REGULATIONS_SYSTEM_PROMPT = """あなたは銀行規定の改定を行うAI
 """
 
 # 規定リストアップ時のユーザープロンプト
-LIST_REGULATIONS_USER_PROMPT = """以下のXML目次（toc）と更新情報（update_info）を参照して、
+LIST_REGULATIONS_USER_PROMPT = """以下のXML目次（toc）と変更情報（update_info）を参照して、
 改定が必要になりそうな規定とその理由を出力してください。
 
 <toc>
@@ -98,9 +98,9 @@ CHECK_REVISIONS_SYSTEM_PROMPT = """あなたは銀行規定の改定を行うAI�
 """
 
 # 改定要否チェック時のユーザープロンプト
-CHECK_REVISIONS_USER_PROMPT = """以下の更新情報（update_info）と規定集の内容（regulation_content）、その規定集の名前から想定された改定理由・改定内容（reason）を確認して、本当に改定が必要かどうかを判断してください。
+CHECK_REVISIONS_USER_PROMPT = """以下の変更情報（update_info）と規定集の内容（regulation_content）、その規定集の名前から想定された改定理由・改定内容（reason）を確認して、本当に改定が必要かどうかを判断してください。
 改定が必要となった場合、コメントに改定が必要な箇所を洗い出します。ただし、具体的な改定後の文面はここでは出力しません。
-改定箇所は可能な限り必要最低限とし、現状更新情報に関連のない箇所に不必要に情報を追加しようとはしないでください。
+改定箇所は可能な限り必要最低限とし、現状変更情報に関連のない箇所に不必要に情報を追加しようとはしないでください。
 
 <update_info>
 {update_info}
@@ -124,7 +124,7 @@ CHECK RESULT JSON:
 <JSON>
 ```
 
-<THOUGHT>では、まず更新情報と規定集の内容の関連性について簡潔に説明してください。
+<THOUGHT>では、まず変更情報と規定集の内容の関連性について簡潔に説明してください。
 その後、具体的に規定集内の章ごとに改定の必要性を確認してください。
 
 <JSON>では、以下のフィールドを含むJSONフォーマットで確認の必要性を提供してください：
@@ -139,7 +139,7 @@ CHECK RESULT JSON:
 CHECK_REVISIONS_REFLECTION_PROMPT = """Round {current_round}/{num_reflections}.
 先ほど生成したJSONを精査し、見落としや間違えがあれば修正してください。
 特に改定が必要と判断した場合、改定が必要な箇所を十全に洗い出してください。
-改定箇所は可能な限り必要最低限とし、現状更新情報に関連のない箇所に不必要に情報を追加しようとはしないでください。
+改定箇所は可能な限り必要最低限とし、現状変更情報に関連のない箇所に不必要に情報を追加しようとはしないでください。
 
 以下の基準に従って、改定の必要性を再確認してください：
 1. 情報の更新：既存の規定内に関連する記述がある場合のみ改定が必要
@@ -298,7 +298,7 @@ def check_revisions(
 ):
     """
     1. target_regulations（なければ base_dir下のtarget_regulations.json から取得）を読み込み、
-       各規定ファイルの内容・更新情報(update_info.txt)・"reason"を LLM に渡して
+       各規定ファイルの内容・変更情報(update_info.txt)・"reason"を LLM に渡して
        "revision_needed" (bool) と "comment" (str) を判断させる。
     2. Reflection（num_reflections回）を行い、最終的なJSONを確定する。
     3. 結果を各規定に付与する。
