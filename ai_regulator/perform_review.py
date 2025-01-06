@@ -189,28 +189,6 @@ IMPROVE_REVISION_USER_PROMPT = """プロジェクトに `revision.json` ファ�
 必ずファイル名を最初に指定し、これらの編集を行うために *SEARCH/REPLACE* ブロックを使用してください。
 """
 
-IMPROVE_REVISION_REFLECTION_PROMPT = """Round {current_round}/{num_reflections}.
-先ほど生成した改定案(複数のペア)をreview_resultで指摘された内容で再度精査し、必要であれば改善してください。
-
-もし修正が必要であれば、ファイルは再度同じjson形式としてください：
-```json
-<JSON>
-```
-
-original_textは、改定前の文面であり、元の改定案のoriginal_textを必ずそのまま引用してください（改変しない）。
-改定箇所は可能な限り必要最低限とし、レビュー結果に関連のない箇所に不必要に情報を追加しようとはしないでください。
-
-もし修正が不要なら、以下のような変更なしの *SEARCH/REPLACE* ブロックを返します。
-revision.json
-```python
-<<<<<<< SEARCH
-=======
->>>>>>> REPLACE
-```
-
-必ずファイル名を最初に指定し、これらの編集を行うために *SEARCH/REPLACE* ブロックを使用してください。
-"""
-
 JSON_FORMAT_FIX_PROMPT = """{error_text}
 ファイルは必ず以下のようなjson形式である必要があります。。
 ```json
