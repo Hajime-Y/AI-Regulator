@@ -2,6 +2,10 @@
 
 AI-Regulatorは、金融機関の規定改定作業を自動化・効率化するためのAIツールです。LLMを活用して、既存の規定文書と変更情報を分析し、新しい規定案を生成します。
 
+## 謝辞
+このプロロェクトは、[SakanaAI](https://github.com/SakanaAI)の[AI Scientist](https://github.com/SakanaAI/AI-Scientist)プロジェクトを参考に作成されました。
+革新的なアイデアと実装に深く感謝いたします。
+
 ## 主な機能
 - 規定文書の分析（規定一覧目次を利用した改定候補の選出・個別確認）
 - LLMによる規定改定案の作成

@@ -11,7 +11,6 @@ import torch
 from datetime import datetime
 from typing import Dict, Any
 
-# aider関連のライブラリは必要に応じてインストールしてください
 from aider.coders import Coder
 from aider.io import InputOutput
 from aider.models import Model
